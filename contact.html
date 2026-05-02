@@ -9,9 +9,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@200;300;400&display=swap" rel="stylesheet" />
+  <meta property="og:title" content="BASHA — Contact" />
+  <meta property="og:description" content="Access is limited. Reach out personally. Each inquiry is handled with the same care as our garments." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="stylesheet" href="assets/css/main.css" />
 </head>
 <body>
+
+  <a href="#main" class="skip-link">Skip to content</a>
 
   <!-- NAV -->
   <nav class="nav" id="nav">
@@ -32,7 +38,7 @@
   </nav>
 
   <!-- PAGE HERO -->
-  <header class="page-hero">
+  <header class="page-hero" id="main">
     <div class="page-hero__bg frame frame--ink"></div>
     <div class="page-hero__content">
       <span class="eyebrow eyebrow--gold">Private Access</span>
@@ -78,30 +84,43 @@
       </div>
 
       <div class="reveal reveal--delay-2">
-        <div class="contact__note">
+        <form class="contact-form" action="#" method="post">
+          <div class="contact-form__field">
+            <label for="contact-name" class="contact-form__label">Full Name</label>
+            <input type="text" id="contact-name" class="contact-form__input" placeholder="Your name" required autocomplete="name" />
+          </div>
+          <div class="contact-form__field">
+            <label for="contact-email" class="contact-form__label">Email</label>
+            <input type="email" id="contact-email" class="contact-form__input" placeholder="Your email address" required autocomplete="email" />
+          </div>
+          <div class="contact-form__field">
+            <label for="contact-subject" class="contact-form__label">Subject</label>
+            <select id="contact-subject" class="contact-form__select" required>
+              <option value="" disabled selected>Select an inquiry type</option>
+              <option value="garment">Garment Inquiry</option>
+              <option value="appointment">Appointment Request</option>
+              <option value="press">Press &amp; Media</option>
+              <option value="collaboration">Collaboration</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="contact-form__field">
+            <label for="contact-message" class="contact-form__label">Message</label>
+            <textarea id="contact-message" class="contact-form__textarea" placeholder="Tell us what brings you here" rows="4" required></textarea>
+          </div>
+          <button type="submit" class="contact-form__submit">
+            <span>Send Inquiry</span>
+            <span class="arrow"></span>
+          </button>
+        </form>
+
+        <div class="contact__note mt-lg">
           <span class="eyebrow eyebrow--gold">A Note</span>
           <p class="mt-sm">
             We do not operate a shopping cart or checkout process.
             Each piece is discussed, confirmed, and handled individually.
-            This is deliberate.
-          </p>
-          <p class="mt-sm">
             A garment that represents composure should not be purchased
             in a rush. Take your time. We will take ours.
-          </p>
-        </div>
-
-        <div class="contact__note mt-md">
-          <span class="eyebrow">Press &amp; Collaboration</span>
-          <p class="mt-sm">
-            For media inquiries, editorial features, or cultural
-            collaborations, please reach out via email with the subject
-            line: <em>"Press"</em> or <em>"Collaboration"</em>.
-          </p>
-          <p class="mt-sm">
-            We are selective — not out of arrogance, but out of
-            alignment. We collaborate only with people and projects
-            that share our values.
           </p>
         </div>
       </div>

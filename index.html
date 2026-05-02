@@ -9,9 +9,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@200;300;400&display=swap" rel="stylesheet" />
+  <meta property="og:title" content="BASHA — A Way of Carrying Yourself" />
+  <meta property="og:description" content="Basha is not a brand. It is a standard. Cinematic, quiet, rooted in Cairo. Clothing for the modern gentleman and the modern woman." />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="en_US" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="BASHA — A Way of Carrying Yourself" />
+  <meta name="twitter:description" content="Presence without noise. Elegance without performance. A cultural identity rooted in Cairo." />
   <link rel="stylesheet" href="assets/css/main.css" />
+  <style>.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;}</style>
 </head>
 <body>
+
+  <a href="#main" class="skip-link">Skip to content</a>
 
   <!-- NAV -->
   <nav class="nav" id="nav">
@@ -32,7 +42,7 @@
   </nav>
 
   <!-- HERO -->
-  <header class="hero">
+  <header class="hero" id="main">
     <div class="hero__bg"></div>
     <div class="hero__content container">
       <span class="hero__eyebrow eyebrow eyebrow--gold">Cairo — Est. Silently</span>
@@ -236,6 +246,24 @@
       <span class="ring">Join the Circle</span>
       <span class="label">@basha.eg</span>
     </a>
+  </section>
+
+  <!-- VIP EMAIL CAPTURE -->
+  <section class="vip-capture">
+    <div class="vip-capture__inner reveal">
+      <span class="eyebrow eyebrow--gold">Private Access</span>
+      <h2 class="mt-sm">Enter the inner circle.</h2>
+      <p class="lead">
+        Early access to new collections. Behind-the-scenes from Cairo.
+        Stories that never reach the feed. Reserved for those who understand the word.
+      </p>
+      <form class="vip-form" action="#" method="post">
+        <label for="vip-email" class="sr-only">Email address</label>
+        <input type="email" id="vip-email" class="vip-form__input" placeholder="Your email address" required autocomplete="email" />
+        <button type="submit" class="vip-form__btn">Join</button>
+      </form>
+      <p class="vip-form__note">No noise. Only what matters. Unsubscribe anytime.</p>
+    </div>
   </section>
 
   <!-- FOOTER -->
