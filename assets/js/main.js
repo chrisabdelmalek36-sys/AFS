@@ -96,17 +96,29 @@
   }
 
   /* -----  PARALLAX-LITE for hero backgrounds  ----- */
-  var heroBg = document.querySelector(".hero__bg");
+  var heroBg = document.querySelector(".hero__bg, .page-hero__bg, .campaign-hero__bg");
+  var heritageSkyline = document.querySelector(".maison-hero__skyline");
+  var heritageTitle = document.querySelector(".maison-hero__title");
 
-  if (heroBg) {
+  if (heroBg || heritageSkyline) {
     window.addEventListener(
       "scroll",
       function () {
         var scrollY = window.pageYOffset;
         var vh = window.innerHeight;
-        if (scrollY < vh * 1.5) {
+        if (scrollY > vh * 1.5) return;
+
+        if (heroBg) {
           heroBg.style.transform =
             "scale(1.05) translateY(" + scrollY * 0.15 + "px)";
+        }
+        if (heritageSkyline) {
+          heritageSkyline.style.transform =
+            "translateY(" + scrollY * 0.18 + "px)";
+        }
+        if (heritageTitle) {
+          heritageTitle.style.transform =
+            "translateY(" + scrollY * -0.08 + "px)";
         }
       },
       { passive: true }

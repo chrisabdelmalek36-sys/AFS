@@ -2319,3 +2319,326 @@ a {
     scroll-behavior: auto !important;
   }
 }
+
+/* =========================================================
+   MAISON BASHA — HERITAGE HERO
+   Cream skyline composition · Old Cairo · EST. 1882
+   ========================================================= */
+:root {
+  --heritage-bg: #f0ead6;
+  --heritage-bg-soft: #e8e0c4;
+  --heritage-ink: #3d2e1a;
+  --heritage-ink-soft: #5a4528;
+  --heritage-gold: #b8923a;
+  --heritage-line: rgba(61, 46, 26, 0.18);
+  --heritage-line-soft: rgba(61, 46, 26, 0.08);
+}
+
+.maison-hero {
+  position: relative;
+  min-height: 100vh;
+  background: var(--heritage-bg);
+  color: var(--heritage-ink);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+}
+
+/* Subtle dotted/grain pattern overlay */
+.maison-hero__pattern {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(61, 46, 26, 0.07) 1px, transparent 1px);
+  background-size: 18px 18px;
+  opacity: 0.7;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.4) 75%, transparent 100%);
+}
+
+.maison-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 245, 215, 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 100%, rgba(61, 46, 26, 0.08) 0%, transparent 50%);
+}
+
+/* Top bar — corner brand marks */
+.maison-hero__topbar {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2.25rem var(--gutter) 0;
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.45em;
+  color: var(--heritage-ink);
+  text-transform: uppercase;
+  opacity: 0;
+  animation: heritageFade 1.6s var(--ease) 0.4s forwards;
+}
+
+.maison-hero__logo {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  letter-spacing: 0.55em;
+  font-weight: 400;
+}
+
+.maison-hero__numeral {
+  font-family: var(--serif);
+  font-size: 0.85rem;
+  letter-spacing: 0.4em;
+  color: var(--heritage-ink-soft);
+}
+
+/* Left timeline column */
+.maison-hero__timeline {
+  position: absolute;
+  left: var(--gutter);
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: left center;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.35em;
+  color: var(--heritage-ink-soft);
+  text-transform: uppercase;
+  opacity: 0;
+  animation: heritageFade 1.6s var(--ease) 0.7s forwards;
+}
+
+.maison-hero__timeline-label {
+  white-space: nowrap;
+}
+
+.maison-hero__timeline-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.maison-hero__timeline-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--heritage-ink-soft);
+  opacity: 0.4;
+}
+
+.maison-hero__timeline-dots span:first-child,
+.maison-hero__timeline-dots span:nth-child(5) {
+  opacity: 1;
+  background: var(--heritage-gold);
+  width: 6px;
+  height: 6px;
+}
+
+/* Center composition */
+.maison-hero__center {
+  position: relative;
+  z-index: 3;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem var(--gutter) 2rem;
+}
+
+.maison-hero__subtitle {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--heritage-ink-soft);
+  margin-bottom: 2.5rem;
+  opacity: 0;
+  animation: heritageFade 1.8s var(--ease) 0.9s forwards;
+}
+
+.maison-hero__line {
+  width: clamp(40px, 8vw, 90px);
+  height: 1px;
+  background: var(--heritage-ink-soft);
+  opacity: 0.5;
+}
+
+.maison-hero__title {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(5rem, 18vw, 16rem);
+  letter-spacing: 0.04em;
+  line-height: 0.95;
+  color: var(--heritage-ink);
+  margin: 0;
+  opacity: 0;
+  animation: heritageRise 2s var(--ease) 1.1s forwards;
+}
+
+.maison-hero__arabic {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-weight: 400;
+  color: var(--heritage-gold);
+  margin-top: 1rem;
+  letter-spacing: 0;
+  direction: rtl;
+  opacity: 0;
+  animation: heritageFade 2s var(--ease) 1.4s forwards;
+}
+
+.maison-hero__ctas {
+  display: flex;
+  gap: 2.5rem;
+  margin-top: 3rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  opacity: 0;
+  animation: heritageFade 2s var(--ease) 1.7s forwards;
+}
+
+/* Cairo skyline at base */
+.maison-hero__skyline {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: clamp(160px, 22vw, 280px);
+  margin-top: auto;
+  pointer-events: none;
+  opacity: 0;
+  animation: heritageRise 2.4s var(--ease) 0.6s forwards;
+}
+
+.maison-hero__skyline-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Scroll cue (heritage variant) */
+.maison-hero__scroll {
+  position: absolute;
+  right: var(--gutter);
+  top: 50%;
+  transform: translateY(-50%) rotate(90deg);
+  transform-origin: right center;
+  z-index: 4;
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--heritage-ink-soft);
+  opacity: 0;
+  animation: heritageFade 1.8s var(--ease) 1.6s forwards;
+}
+
+.maison-hero__scroll::after {
+  content: "";
+  display: inline-block;
+  margin-left: 0.8rem;
+  width: 36px;
+  height: 1px;
+  background: var(--heritage-ink-soft);
+  vertical-align: middle;
+  animation: scrollCue 2.4s var(--ease) infinite;
+  transform-origin: left;
+}
+
+/* Heritage button variants — for cream background */
+.btn--heritage {
+  color: var(--heritage-ink);
+}
+
+.btn--heritage::after {
+  background: var(--heritage-ink);
+}
+
+.btn--heritage:hover {
+  color: var(--heritage-gold);
+}
+
+.btn--heritage:hover::after {
+  background: var(--heritage-gold);
+}
+
+.btn--heritage-gold {
+  color: var(--heritage-gold);
+}
+
+.btn--heritage-gold::after {
+  background: var(--heritage-gold);
+}
+
+.btn--heritage-gold:hover {
+  color: var(--heritage-ink);
+}
+
+.btn--heritage-gold:hover::after {
+  background: var(--heritage-ink);
+}
+
+/* Nav adapts to cream hero — only when not scrolled */
+body:has(.maison-hero) .nav:not(.is-scrolled) {
+  mix-blend-mode: normal;
+}
+
+body:has(.maison-hero) .nav:not(.is-scrolled) .nav__logo,
+body:has(.maison-hero) .nav:not(.is-scrolled) .nav__links a {
+  color: var(--heritage-ink);
+}
+
+body:has(.maison-hero) .nav:not(.is-scrolled) .nav__toggle span {
+  background: var(--heritage-ink);
+}
+
+@keyframes heritageFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes heritageRise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive — heritage hero */
+@media (max-width: 760px) {
+  .maison-hero__timeline {
+    display: none;
+  }
+  .maison-hero__scroll {
+    display: none;
+  }
+  .maison-hero__topbar {
+    padding-top: 5rem;
+  }
+  .maison-hero__center {
+    padding-top: 2rem;
+  }
+  .maison-hero__ctas {
+    gap: 1.5rem;
+  }
+}
