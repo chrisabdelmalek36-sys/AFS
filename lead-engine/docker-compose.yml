@@ -1,0 +1,42 @@
+# Self-contained stack for your own server (e.g. an Egyptian VPS).
+# All data stays on the machine that runs this — nothing leaves it.
+#   Start:   docker compose up -d
+#   Migrate: docker compose run --rm app npm run migrate
+#   Run once: docker compose run --rm app npm run pipeline
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: afs_leads
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d afs_leads"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: node:22-slim
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/afs_leads
+      PIPELINE_MODE: ${PIPELINE_MODE:-sample}
+      MONTHLY_BUDGET_USD: ${MONTHLY_BUDGET_USD:-200}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      NEWSAPI_KEY: ${NEWSAPI_KEY:-}
+      TZ: Africa/Cairo
+    volumes:
+      - .:/app
+    command: sh -c "npm install && npm run migrate && npm run cron"
+
+volumes:
+  pgdata:
