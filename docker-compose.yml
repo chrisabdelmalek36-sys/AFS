@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────────────
+#  AFS Lead Engine — run the WHOLE system on your own computer.
+#
+#  You only need Docker Desktop installed. Then, in this folder, run:
+#
+#      docker compose up
+#
+#  Wait until you see "Ready", then open:  http://localhost:3000
+#
+#  To stop it: press Ctrl+C  (or run:  docker compose down)
+#  Your leads are saved on your computer and survive restarts.
+# ─────────────────────────────────────────────────────────────────────
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: afs_leads
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d afs_leads"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Finds + tiers leads, then keeps running to scan every morning.
+  engine:
+    image: node:22-slim
+    working_dir: /app/lead-engine
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/afs_leads
+      PIPELINE_MODE: ${PIPELINE_MODE:-sample}
+      MONTHLY_BUDGET_USD: ${MONTHLY_BUDGET_USD:-200}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      NEWSAPI_KEY: ${NEWSAPI_KEY:-}
+      TZ: Africa/Cairo
+    volumes:
+      - .:/app
+    command: >
+      sh -c "npm install --no-audit --no-fund &&
+             npm run migrate &&
+             npm run seed &&
+             npm run pipeline -- --mode=$${PIPELINE_MODE:-sample} &&
+             npm run cron"
+
+  # The website you open in your browser.
+  dashboard:
+    image: node:22-slim
+    working_dir: /app/dashboard
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/afs_leads
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      TZ: Africa/Cairo
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+    command: >
+      sh -c "npm install --no-audit --no-fund &&
+             node scripts/wait-for-db.mjs &&
+             npm run build &&
+             npm run start"
+
+volumes:
+  pgdata:
