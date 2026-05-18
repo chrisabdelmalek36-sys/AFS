@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { config } from "../config.js";
 import { runPipeline } from "../pipeline/run.js";
 import { processOutreachQueue } from "../outreach/sender.js";
+import { runDigest } from "../digest/digest.js";
 import { log } from "../lib/logger.js";
 
 // Long-running worker: runs the discovery pipeline every day on schedule
@@ -35,8 +36,23 @@ cron.schedule(
   { timezone: config.tz },
 );
 
+// Daily owner digest (default 07:00 Africa/Cairo).
+cron.schedule(
+  config.digestCron,
+  async () => {
+    log.step("Daily digest");
+    try {
+      await runDigest();
+    } catch (e) {
+      log.error("digest failed:", e);
+    }
+  },
+  { timezone: config.tz },
+);
+
 log.info(
   `Outreach queue schedule "${config.outreachCron}" ` +
     `(liveSend=${config.outreach.liveSend})`,
 );
+log.info(`Daily digest schedule "${config.digestCron}" → ${config.digest.ownerEmail || "(set AFS_OWNER_EMAIL)"}`);
 log.info("Scheduler armed. Waiting for next run… (Ctrl+C to stop)");

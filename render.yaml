@@ -32,7 +32,7 @@ services:
     # site still starts.
     startCommand: >
       cd lead-engine &&
-      (npm run migrate && npm run seed && npm run pipeline -- --mode=sample || true) &&
+      (npm run migrate && npm run seed && npm run pipeline -- --mode=sample && npm run digest || true) &&
       cd ../dashboard && npm run start
     healthCheckPath: /
     envVars:

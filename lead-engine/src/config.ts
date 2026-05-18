@@ -49,8 +49,13 @@ export const config = {
     liveSend: bool("OUTREACH_LIVE_SEND", false),
   },
 
+  digest: {
+    ownerEmail: process.env.AFS_OWNER_EMAIL ?? "",
+  },
+
   cron: process.env.DAILY_CRON ?? "0 6 * * *",
   outreachCron: process.env.OUTREACH_CRON ?? "*/30 * * * *",
+  digestCron: process.env.DIGEST_CRON ?? "0 7 * * *",
   tz: process.env.TZ ?? "Africa/Cairo",
 };
 

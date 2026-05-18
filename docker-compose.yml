@@ -39,6 +39,11 @@ services:
       MONTHLY_BUDGET_USD: ${MONTHLY_BUDGET_USD:-200}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       NEWSAPI_KEY: ${NEWSAPI_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      OUTREACH_LIVE_SEND: ${OUTREACH_LIVE_SEND:-false}
+      AFS_FROM_EMAIL: ${AFS_FROM_EMAIL:-sales@afstrade.example}
+      AFS_OWNER_EMAIL: ${AFS_OWNER_EMAIL:-}
       TZ: Africa/Cairo
     volumes:
       - .:/app
@@ -47,6 +52,7 @@ services:
              npm run migrate &&
              npm run seed &&
              npm run pipeline -- --mode=$${PIPELINE_MODE:-sample} &&
+             npm run digest &&
              npm run cron"
 
   # The website you open in your browser.

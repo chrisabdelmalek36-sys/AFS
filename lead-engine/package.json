@@ -9,6 +9,7 @@
     "seed": "tsx src/cli/seed.ts",
     "pipeline": "tsx src/cli/run-once.ts",
     "outreach": "tsx src/cli/outreach.ts",
+    "digest": "tsx src/cli/digest.ts",
     "leads": "tsx src/cli/show-leads.ts",
     "estimate": "tsx src/cli/estimate.ts",
     "cron": "tsx src/cron/scheduler.ts",

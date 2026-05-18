@@ -135,10 +135,24 @@ the exact server in Phase 2; nothing here locks you in.
 
 ---
 
-## 7. What's next
+## 7. Other commands (Phases 3–4)
 
-**Phase 2** — a web dashboard (leads table, map with tier-colored pins,
-route planner). Phase 1's database is already shaped for it.
+| Command | What it does |
+|---|---|
+| `npm run outreach` | Process the email sequence queue once (sends when due; **simulated** unless `RESEND_API_KEY` + `OUTREACH_LIVE_SEND=true`). |
+| `npm run digest` | Build today's owner digest (new leads, follow-ups due, planned visits, hot news) and email it (simulated unless live-send + `AFS_OWNER_EMAIL`). |
+| `npm run cron` | Long-running worker: daily discovery (06:00), outreach queue (every 30 min), digest (07:00) — all Africa/Cairo. |
 
-Phase 1 is complete and proven. Review the leads above, then say the
-word and I'll start Phase 2.
+Outreach drafts are generated from the dashboard ("Generate Outreach"
+on a lead). Drafts use strong templates by default; set
+`ANTHROPIC_API_KEY` for Claude-personalised copy. Every cold email
+carries a signed unsubscribe link; unsubscribing permanently suppresses
+the lead on all channels.
+
+## 8. Status
+
+Phases 1–4 are complete and proven end-to-end on sample data:
+discovery + dedupe + tiering (1), dashboard + map + routes (2),
+outreach across all channels with compliance (3), follow-up reminders +
+daily digest (4). Add real API keys to switch from sample to live —
+no code changes.
