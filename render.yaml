@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────
+#  One-click browser deploy (Render Blueprint).
+#  Creates a free database + the dashboard website automatically.
+#  The user never installs anything or uses a terminal.
+#
+#  Note: the free database is a starter tier (fine to SEE the system
+#  working with the 21 sample leads). For permanent / real-lead use we
+#  move to a paid tier or your own server in Egypt — same code.
+# ─────────────────────────────────────────────────────────────────────
+databases:
+  - name: afs-leads-db
+    plan: free
+    databaseName: afs_leads
+    user: afs
+    region: frankfurt        # EU region — closest Render option to Egypt
+
+services:
+  - type: web
+    name: afs-dashboard
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: claude/afs-lead-engine-Yi83k
+    # Install BOTH apps' deps (include dev tools needed to build) and
+    # build the dashboard.
+    buildCommand: >
+      cd lead-engine && npm install --include=dev --no-audit --no-fund &&
+      cd ../dashboard && npm install --include=dev --no-audit --no-fund &&
+      npm run build
+    # On boot: set up the database, load the sample leads, then serve
+    # the website. All steps are safe to repeat. If seeding hiccups the
+    # site still starts.
+    startCommand: >
+      cd lead-engine &&
+      (npm run migrate && npm run seed && npm run pipeline -- --mode=sample || true) &&
+      cd ../dashboard && npm run start
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: afs-leads-db
+          property: connectionString
+      - key: NODE_VERSION
+        value: "22"
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+      - key: PIPELINE_MODE
+        value: sample
+      - key: TZ
+        value: Africa/Cairo
