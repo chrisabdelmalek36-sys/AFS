@@ -17,7 +17,13 @@ export const config = {
   databaseUrl:
     process.env.DATABASE_URL ??
     "postgres://postgres:postgres@localhost:5432/afs_leads",
-  mode: (process.env.PIPELINE_MODE === "live" ? "live" : "sample") as PipelineMode,
+  // 'live' / 'sample' force it; 'auto' (or unset) picks live automatically
+  // once a Google Maps key exists — so the user only has to paste the key.
+  mode: ((): PipelineMode => {
+    const m = process.env.PIPELINE_MODE;
+    if (m === "live" || m === "sample") return m;
+    return process.env.GOOGLE_MAPS_API_KEY ? "live" : "sample";
+  })(),
 
   monthlyBudgetUsd: num("MONTHLY_BUDGET_USD", 200),
 
