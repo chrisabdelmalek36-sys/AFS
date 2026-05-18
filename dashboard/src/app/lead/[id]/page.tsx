@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getLead, contactHistory, STATUSES } from "@/lib/leads";
+import {
+  getLead,
+  contactHistory,
+  messagesForLead,
+  STATUSES,
+} from "@/lib/leads";
 import { q } from "@/lib/db";
+import { generateOutreach } from "@/lib/outreach";
 import { Card, TierBadge, StatusBadge, egp } from "@/components/ui";
 import { visitBrief, whatsappDraft } from "@/lib/brief";
 
@@ -18,7 +24,19 @@ export default async function LeadPage({
   const lead = await getLead(id);
   if (!lead) notFound();
   const history = await contactHistory(id);
+  const messages = await messagesForLead(id);
   const brief = visitBrief(lead);
+
+  async function genOutreach() {
+    "use server";
+    const fresh = await getLead(id);
+    if (fresh) await generateOutreach(fresh);
+    revalidatePath(`/lead/${id}`);
+  }
+
+  const waDraft =
+    messages.find((m) => m.channel === "whatsapp")?.body ??
+    whatsappDraft(lead);
 
   async function logContact(formData: FormData) {
     "use server";
@@ -43,9 +61,11 @@ export default async function LeadPage({
   const waPhone = lead.phone_norm
     ? `20${lead.phone_norm}`
     : (lead.phone ?? "").replace(/[^\d]/g, "");
-  const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(
-    whatsappDraft(lead),
-  )}`;
+  const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(waDraft)}`;
+
+  const emailMsgs = messages.filter((m) => m.channel === "email");
+  const liMsg = messages.find((m) => m.channel === "linkedin");
+  const visitMsg = messages.find((m) => m.channel === "visit");
 
   return (
     <div className="space-y-4">
@@ -87,7 +107,7 @@ export default async function LeadPage({
           )}
         </Card>
 
-        <Card title="Outreach (Phase 2: draft & manual send)" className="lg:col-span-2">
+        <Card title="Outreach" className="lg:col-span-2">
           {lead.suppressed ? (
             <p className="text-sm text-rose-600">
               This lead is on the do-not-contact list ({lead.suppressed_reason ?? "blocked"}).
@@ -113,19 +133,89 @@ export default async function LeadPage({
                 )}
               </div>
               <p className="text-xs text-slate-500">
-                WhatsApp Mode 1 (safe): opens with the message pre-typed — nothing
-                is sent until you tap send. Personalised AI drafts arrive in Phase 3.
+                WhatsApp Mode 1 (safe): opens with the message pre-typed —
+                nothing is sent until you tap send.
               </p>
+
+              <form action={genOutreach}>
+                <button className="rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700">
+                  {messages.length
+                    ? "Regenerate all drafts"
+                    : "Generate Outreach (all channels)"}
+                </button>
+                <span className="ml-2 text-xs text-slate-500">
+                  {messages.length
+                    ? `${messages.length} drafts · by ${messages[0]?.generated_by}`
+                    : "Email sequence + WhatsApp + LinkedIn + visit brief"}
+                </span>
+              </form>
+
+              {emailMsgs.length > 0 && (
+                <div className="rounded-lg border border-slate-200 text-sm">
+                  <p className="border-b bg-slate-50 px-3 py-2 font-semibold text-slate-600">
+                    Email sequence
+                  </p>
+                  <ul className="divide-y divide-slate-100">
+                    {emailMsgs.map((m) => (
+                      <li key={m.id} className="px-3 py-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">
+                            {m.step_label} — {m.subject}
+                          </span>
+                          <span
+                            className={`rounded px-2 py-0.5 text-xs ${
+                              m.status === "sent"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : m.status === "simulated"
+                                  ? "bg-sky-100 text-sky-700"
+                                  : m.status === "skipped"
+                                    ? "bg-slate-100 text-slate-500"
+                                    : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {m.status}
+                            {m.scheduled_for && m.status === "scheduled"
+                              ? ` · ${new Date(m.scheduled_for).toLocaleDateString()}`
+                              : ""}
+                          </span>
+                        </div>
+                        <pre className="mt-1 whitespace-pre-wrap font-sans text-xs text-slate-600">
+                          {m.body}
+                        </pre>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {liMsg && (
+                <div className="rounded-lg bg-slate-50 p-3 text-sm">
+                  <p className="mb-1 font-semibold text-slate-600">
+                    LinkedIn (draft only — paste manually)
+                  </p>
+                  <pre className="whitespace-pre-wrap font-sans text-xs text-slate-700">
+                    {liMsg.body}
+                  </pre>
+                </div>
+              )}
 
               <div className="rounded-lg bg-slate-50 p-3 text-sm">
                 <p className="mb-1 font-semibold text-slate-600">Visit brief</p>
-                <p className="text-xs text-slate-500">{brief.address}</p>
-                <p className="mt-2"><b>Ask for:</b> {brief.askFor}</p>
-                <p className="mt-1"><b>Bring:</b> {brief.bring.join(", ")}</p>
-                <p className="mt-1"><b>Openers:</b></p>
-                <ul className="ml-4 list-disc text-slate-700">
-                  {brief.openers.map((o) => <li key={o}>{o}</li>)}
-                </ul>
+                {visitMsg ? (
+                  <pre className="whitespace-pre-wrap font-sans text-xs text-slate-700">
+                    {visitMsg.body}
+                  </pre>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-500">{brief.address}</p>
+                    <p className="mt-2"><b>Ask for:</b> {brief.askFor}</p>
+                    <p className="mt-1"><b>Bring:</b> {brief.bring.join(", ")}</p>
+                    <p className="mt-1"><b>Openers:</b></p>
+                    <ul className="ml-4 list-disc text-slate-700">
+                      {brief.openers.map((o) => <li key={o}>{o}</li>)}
+                    </ul>
+                  </>
+                )}
               </div>
             </div>
           )}

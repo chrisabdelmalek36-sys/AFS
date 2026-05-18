@@ -59,12 +59,33 @@ progress as a **follow-up due**.
 
 ---
 
+## Phase 3 — Outreach (built)
+
+Open any lead → **Generate Outreach**. The system writes, per lead:
+
+- **Email**: a 5-step sequence (Day 0 / 3 / 8 / 15 / 30), each with a
+  compliant footer (unsubscribe link + physical address).
+- **WhatsApp**: Mode 1 — opens WhatsApp with the message pre-typed.
+- **LinkedIn**: draft only (paste manually — protects your account).
+- **Visit**: a 1-page door-to-door brief.
+
+Drafts use **strong templates by default (no AI key, no cost)**. Add
+`ANTHROPIC_API_KEY` for Claude-personalised drafts — no code change.
+
+The **/outreach** page monitors every lead's sequence progress.
+
+**Safety, enforced:**
+
+- Emails only actually send when `RESEND_API_KEY` is set **and**
+  `OUTREACH_LIVE_SEND=true`. Otherwise every send is **simulated**
+  (nothing leaves) — so it is safe by default.
+- Every email carries a working, signed unsubscribe link. Unsubscribing
+  is permanent and blocks the lead on **every** channel forever.
+- The sequence auto-stops if the lead replies, advances, or is
+  suppressed. The engine worker processes the queue (`npm run outreach`,
+  or automatically via the daily worker).
+
 ## What's next
 
-**Phase 3** — the system writes the WhatsApp / email / visit messages
-*for you*, personalised per lead using Claude and recent news about them
-(email auto-send with unsubscribe; WhatsApp stays Mode 1 manual until
-your Business API is approved; LinkedIn draft-only).
-
-Phase 2 is complete. Open the four screens, click around with the
-practice data, then say the word for Phase 3.
+**Phase 4** — auto follow-up reminders and a 7 AM Cairo daily digest
+email. Phases 1–3 are complete and proven end-to-end on sample data.

@@ -71,6 +71,7 @@ export function Nav() {
     ["/dashboard", "Dashboard"],
     ["/leads", "Leads"],
     ["/map", "Map"],
+    ["/outreach", "Outreach"],
   ];
   return (
     <header className="border-b border-slate-200 bg-white">

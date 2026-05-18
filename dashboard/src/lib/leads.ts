@@ -1,5 +1,18 @@
 import { q } from "./db";
 
+// Mirrors the engine's name normalization (do-not-contact matching).
+export function normalizeName(raw?: string | null): string {
+  if (!raw) return "";
+  return raw
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s؀-ۿ]/g, " ")
+    .replace(/\b(co|company|corp|llc|ltd|inc|group|egypt|cairo|the|for|and)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export interface Lead {
   id: number;
   name: string;
@@ -169,6 +182,65 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
     pipelineMin,
     pipelineMax,
   };
+}
+
+export interface OutreachMessage {
+  id: number;
+  lead_id: number;
+  channel: string;
+  step_index: number;
+  step_label: string | null;
+  subject: string | null;
+  body: string;
+  status: string;
+  scheduled_for: string | null;
+  sent_at: string | null;
+  generated_by: string;
+}
+
+export async function messagesForLead(
+  leadId: number,
+): Promise<OutreachMessage[]> {
+  return q<OutreachMessage>(
+    `SELECT id, lead_id, channel, step_index, step_label, subject, body,
+            status, scheduled_for, sent_at, generated_by
+       FROM outreach_messages WHERE lead_id=$1
+      ORDER BY channel, step_index`,
+    [leadId],
+  );
+}
+
+export interface OutreachRow {
+  id: number;
+  name: string;
+  tier: string | null;
+  category: string | null;
+  status: string;
+  suppressed: boolean;
+  outreach_generated_at: string | null;
+  emails_total: number;
+  emails_done: number;
+  next_send: string | null;
+}
+
+export async function outreachQueue(): Promise<OutreachRow[]> {
+  return q<OutreachRow>(
+    `SELECT l.id, l.name, l.tier, l.category, l.status, l.suppressed,
+            l.outreach_generated_at,
+            COUNT(m.*) FILTER (WHERE m.channel='email')          AS emails_total,
+            COUNT(m.*) FILTER (WHERE m.channel='email'
+              AND m.status IN ('sent','simulated'))              AS emails_done,
+            MIN(m.scheduled_for) FILTER (WHERE m.channel='email'
+              AND m.status='scheduled')                          AS next_send
+       FROM leads l
+       LEFT JOIN outreach_messages m ON m.lead_id=l.id
+      WHERE l.outreach_generated_at IS NOT NULL OR NOT l.suppressed
+      GROUP BY l.id
+      ORDER BY l.outreach_generated_at DESC NULLS LAST,
+               CASE l.tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
+                           WHEN 'Silver' THEN 2 ELSE 3 END
+      LIMIT 500`,
+  );
 }
 
 export async function contactHistory(leadId: number) {

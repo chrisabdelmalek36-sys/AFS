@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { config } from "../config.js";
 import { runPipeline } from "../pipeline/run.js";
+import { processOutreachQueue } from "../outreach/sender.js";
 import { log } from "../lib/logger.js";
 
 // Long-running worker: runs the discovery pipeline every day on schedule
@@ -21,4 +22,21 @@ cron.schedule(
   { timezone: config.tz },
 );
 
+// Process the email outreach sequence regularly (default every 30 min).
+cron.schedule(
+  config.outreachCron,
+  async () => {
+    try {
+      await processOutreachQueue();
+    } catch (e) {
+      log.error("outreach queue failed:", e);
+    }
+  },
+  { timezone: config.tz },
+);
+
+log.info(
+  `Outreach queue schedule "${config.outreachCron}" ` +
+    `(liveSend=${config.outreach.liveSend})`,
+);
 log.info("Scheduler armed. Waiting for next run… (Ctrl+C to stop)");

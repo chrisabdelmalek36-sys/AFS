@@ -41,7 +41,16 @@ export const config = {
       "AFS-LeadEngine/1.0 (+contact: info@afstrade.example)",
   },
 
+  outreach: {
+    resendApiKey: process.env.RESEND_API_KEY ?? "",
+    fromEmail: process.env.AFS_FROM_EMAIL ?? "sales@afstrade.example",
+    // Real emails are sent ONLY when this is explicitly true AND a Resend
+    // key is present. Otherwise every send is safely simulated.
+    liveSend: bool("OUTREACH_LIVE_SEND", false),
+  },
+
   cron: process.env.DAILY_CRON ?? "0 6 * * *",
+  outreachCron: process.env.OUTREACH_CRON ?? "*/30 * * * *",
   tz: process.env.TZ ?? "Africa/Cairo",
 };
 
