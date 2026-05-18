@@ -57,7 +57,7 @@ export async function buildDigestData(): Promise<DigestData> {
       `SELECT id,name,tier,category,region,status,last_contacted_at
          FROM leads
         WHERE NOT suppressed
-          AND status IN ('Contacted','Replied','Meeting','Quote Sent')
+          AND status IN ('Contacted','Replied','Meeting','Quote Sent','Postponed')
           AND (
             (follow_up_at IS NOT NULL AND follow_up_at <= now())
             OR (follow_up_at IS NULL AND last_contacted_at IS NULL)

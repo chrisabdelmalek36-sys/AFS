@@ -35,6 +35,7 @@ export interface Lead {
   freshness: number;
   discovered_date: string;
   last_contacted_at: string | null;
+  follow_up_at: string | null;
   source_primary: string | null;
   source_url: string | null;
   suppressed: boolean;
@@ -43,8 +44,11 @@ export interface Lead {
 
 export const STATUSES = [
   "New", "Contacted", "Replied", "Meeting",
-  "Quote Sent", "Closed Won", "Closed Lost",
+  "Quote Sent", "Postponed", "Closed Won", "Closed Lost",
 ] as const;
+
+// Leads still needing first action (shown on the map / route planner).
+export const ACTIONABLE_STATUS = "New";
 
 export interface LeadFilter {
   tier?: string;
@@ -153,10 +157,13 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
   const followupsDue = await q<Lead>(
     `SELECT * FROM leads
       WHERE NOT suppressed
-        AND status IN ('Contacted','Replied','Meeting','Quote Sent')
-        AND (last_contacted_at IS NULL
-             OR last_contacted_at < now() - interval '7 days')
-      ORDER BY last_contacted_at NULLS FIRST
+        AND status IN ('Contacted','Replied','Meeting','Quote Sent','Postponed')
+        AND (
+          (follow_up_at IS NOT NULL AND follow_up_at <= now())
+          OR (follow_up_at IS NULL AND (last_contacted_at IS NULL
+              OR last_contacted_at < now() - interval '7 days'))
+        )
+      ORDER BY follow_up_at NULLS FIRST, last_contacted_at NULLS FIRST
       LIMIT 25`,
   );
   const recentRuns = await q<{

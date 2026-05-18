@@ -26,8 +26,10 @@ export async function POST(req: Request) {
         [body.ids],
       )
     : await q<RouteStop>(
+        // Only route leads still to approach (status='New'); contacted /
+        // postponed leads are excluded so you don't re-visit them.
         `SELECT id, name, lat, lng, tier, address FROM leads
-          WHERE lat IS NOT NULL AND NOT suppressed
+          WHERE lat IS NOT NULL AND NOT suppressed AND status = 'New'
             ${body.region ? "AND region = $1" : ""}
           ORDER BY CASE tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
                              WHEN 'Silver' THEN 2 ELSE 3 END,

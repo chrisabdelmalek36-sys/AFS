@@ -34,6 +34,30 @@ export default async function LeadPage({
     revalidatePath(`/lead/${id}`);
   }
 
+  // One-click status change: stamps contact + (for Postponed) a
+  // follow-up date, and the lead drops off the map automatically.
+  async function quickStatus(formData: FormData) {
+    "use server";
+    const status = String(formData.get("status") ?? "");
+    if (!status) return;
+    const days = Number(formData.get("followDays") ?? 0);
+    await q(
+      `INSERT INTO contact_history (lead_id, channel, direction, note, new_status)
+       VALUES ($1,'note','out',$2,$3)`,
+      [id, `Marked ${status}`, status],
+    );
+    await q(
+      `UPDATE leads
+          SET status=$2,
+              last_contacted_at=now(),
+              follow_up_at = CASE WHEN $3 > 0
+                THEN now() + ($3 || ' days')::interval ELSE follow_up_at END
+        WHERE id=$1`,
+      [id, status, days],
+    );
+    revalidatePath(`/lead/${id}`);
+  }
+
   const waDraft =
     messages.find((m) => m.channel === "whatsapp")?.body ??
     whatsappDraft(lead);
@@ -83,6 +107,40 @@ export default async function LeadPage({
           </span>
         )}
       </div>
+
+      {!lead.suppressed && (
+        <Card title="Quick actions — these remove the lead from the map">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { s: "Contacted", d: 0, c: "bg-indigo-600 hover:bg-indigo-700" },
+              { s: "Postponed", d: 14, c: "bg-amber-600 hover:bg-amber-700" },
+              { s: "Meeting", d: 0, c: "bg-orange-600 hover:bg-orange-700" },
+              { s: "Quote Sent", d: 0, c: "bg-fuchsia-600 hover:bg-fuchsia-700" },
+              { s: "Closed Won", d: 0, c: "bg-emerald-600 hover:bg-emerald-700" },
+              { s: "Closed Lost", d: 0, c: "bg-rose-600 hover:bg-rose-700" },
+            ].map((b) => (
+              <form action={quickStatus} key={b.s}>
+                <input type="hidden" name="status" value={b.s} />
+                <input type="hidden" name="followDays" value={b.d} />
+                <button
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium text-white ${b.c} ${
+                    lead.status === b.s ? "opacity-50" : ""
+                  }`}
+                >
+                  {b.s === "Postponed" ? "Postpone 2 weeks" : `Mark ${b.s}`}
+                </button>
+              </form>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Currently <b>{lead.status}</b>
+            {lead.follow_up_at
+              ? ` · follow up ${new Date(lead.follow_up_at).toLocaleDateString()}`
+              : ""}
+            . Only <b>New</b> leads appear on the map and in route planning.
+          </p>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Details" className="lg:col-span-1">

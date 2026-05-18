@@ -3,7 +3,9 @@ import { query } from "../db/client.js";
 import { log } from "../lib/logger.js";
 
 // Sequence stops the moment a lead engages or opts out.
-const STOP_STATUSES = ["Replied", "Meeting", "Quote Sent", "Closed Won", "Closed Lost"];
+const STOP_STATUSES = [
+  "Replied", "Meeting", "Quote Sent", "Postponed", "Closed Won", "Closed Lost",
+];
 
 interface DueRow {
   id: number;
