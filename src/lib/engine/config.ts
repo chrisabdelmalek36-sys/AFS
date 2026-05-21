@@ -15,7 +15,10 @@ export type PipelineMode = "sample" | "live";
 
 export const config = {
   databaseUrl:
-    process.env.DATABASE_URL ??
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
     "postgres://postgres:postgres@localhost:5432/afs_leads",
   // 'live' / 'sample' force it; anything else (auto / unset) -> live, since
   // the OSM source is free and key-less, so live always works.
