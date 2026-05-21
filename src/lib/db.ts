@@ -1,7 +1,13 @@
 import pg, { type QueryResult, type QueryResultRow } from "pg";
 
+// Vercel's Neon integration may name the env var POSTGRES_URL (newer
+// integrations) or DATABASE_URL (older / classic). Accept both, plus
+// Prisma's variants, so the user never has to rename anything by hand.
 const url =
-  process.env.DATABASE_URL ??
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.POSTGRES_URL_NON_POOLING ||
   "postgres://postgres:postgres@localhost:5432/afs_leads";
 
 // One pool, reused across hot reloads.
