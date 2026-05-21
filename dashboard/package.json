@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
-    "postbuild": "cd ../lead-engine && npm install --include=dev --no-audit --no-fund && npm run migrate && npm run seed && npm run pipeline -- --mode=sample && npm run digest || echo 'postbuild seed skipped'",
+    "postbuild": "cd ../lead-engine && npm install --include=dev --no-audit --no-fund && npm run migrate && npm run seed && npm run pipeline -- --mode=sample && npm run pipeline -- --mode=live && npm run digest || echo 'postbuild seed skipped'",
     "start": "next start -p ${PORT:-3000}",
     "lint": "next lint"
   },

@@ -8,6 +8,7 @@ import { freshnessScore } from "../lib/freshness.js";
 import { findWebsiteEmail } from "../enrich/website.js";
 import type { RawLead, Source } from "../sources/types.js";
 import { sampleSource } from "../sources/sampleData.js";
+import { osmPlacesSource } from "../sources/osmPlaces.js";
 import { googlePlacesSource } from "../sources/googlePlaces.js";
 import { newsSource } from "../sources/news.js";
 import { govTenderSource } from "../sources/govTenders.js";
@@ -24,7 +25,9 @@ interface Merged extends RawLead {
 
 function pickSources(mode: string): Source[] {
   if (mode === "sample") return [sampleSource];
-  return [googlePlacesSource, newsSource, govTenderSource];
+  // OSM is the FREE primary source (real businesses, no key). Google Places
+  // skips itself if no key. News + gov work without keys (GDELT free).
+  return [osmPlacesSource, googlePlacesSource, newsSource, govTenderSource];
 }
 
 function mergeBatch(raw: RawLead[]): Merged[] {
