@@ -112,6 +112,13 @@ function templates(lead: Lead): Generated {
   return { email, whatsapp, linkedin, visit };
 }
 
+// Drop any message whose text content is empty/whitespace. Anthropic returns
+// 400 "text content blocks must be non-empty" otherwise.
+type AnthropicMessage = { role: "user" | "assistant"; content: string };
+function sanitizeMessages(msgs: AnthropicMessage[]): AnthropicMessage[] {
+  return msgs.filter((m) => typeof m.content === "string" && m.content.trim().length > 0);
+}
+
 // ---- Claude generation (used when ANTHROPIC_API_KEY is set) ----
 async function claude(lead: Lead): Promise<Generated | null> {
   if (!KEY) return null;
@@ -131,6 +138,9 @@ async function claude(lead: Lead): Promise<Generated | null> {
     `\nDo NOT include an unsubscribe footer (added automatically). ` +
     `WhatsApp <=600 chars. LinkedIn <=300 chars. visit = a short visit brief.`;
 
+  const messages = sanitizeMessages([{ role: "user", content: prompt }]);
+  if (messages.length === 0) return null;
+
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -142,7 +152,7 @@ async function claude(lead: Lead): Promise<Generated | null> {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 2500,
-        messages: [{ role: "user", content: prompt }],
+        messages,
       }),
     });
     if (!res.ok) return null;
