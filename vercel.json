@@ -1,9 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "buildCommand": "npm install --include=dev --no-audit --no-fund && npm run build",
-  "installCommand": "echo 'install handled by buildCommand'",
-  "outputDirectory": ".next",
   "crons": [
     {
       "path": "/api/cron/refresh",
