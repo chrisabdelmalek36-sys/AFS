@@ -1,28 +1,31 @@
 name: AFS Lead Engine — daily auto run
 
-# Runs the lead finder automatically every morning with NO server.
-# GitHub schedules it for free. Also runnable on demand from the
-# Actions tab ("Run workflow").
+# Free, scheduled discovery + outreach + digest.
+# Vercel's built-in Cron Job (vercel.json) already covers the daily
+# news refresh inside the deployed app. THIS workflow runs the FULL
+# pipeline (OSM + news + tenders + outreach + digest) once a day
+# against the same hosted database. Also manually triggerable from the
+# Actions tab.
 #
-# NOTE: GitHub only runs scheduled workflows from the DEFAULT branch
-# (main). This file must live on main to fire on its own.
+# NOTE: GitHub only fires scheduled workflows on the default branch.
+# For automatic running, this file must reach main.
 #
-# Required repo secret:  DATABASE_URL  (your hosted Postgres URL)
-# Optional repo secrets (add to get REAL leads / live outreach):
-#   GOOGLE_MAPS_API_KEY, NEWSAPI_KEY, ANTHROPIC_API_KEY,
-#   RESEND_API_KEY, AFS_OWNER_EMAIL, AFS_FROM_EMAIL
+# Required repo secret:   DATABASE_URL    (your hosted Postgres URL)
+# Optional repo secrets:  GOOGLE_MAPS_API_KEY, NEWSAPI_KEY,
+#                         ANTHROPIC_API_KEY, RESEND_API_KEY,
+#                         AFS_OWNER_EMAIL, AFS_FROM_EMAIL,
+#                         OUTREACH_LIVE_SEND, MONTHLY_BUDGET_USD
 
 on:
   schedule:
-    # 04:00 UTC ≈ early morning Cairo. Adjust if you like.
-    - cron: "0 4 * * *"
+    - cron: "0 4 * * *"        # 04:00 UTC ≈ Cairo morning
   workflow_dispatch:
     inputs:
       mode:
-        description: "Pipeline mode (auto = live if a Google key secret is set)"
+        description: "Pipeline mode"
         type: choice
-        default: auto
-        options: [auto, sample, live]
+        default: live
+        options: [live, sample]
 
 concurrency:
   group: lead-engine
@@ -31,9 +34,6 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: lead-engine
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
@@ -59,26 +59,14 @@ jobs:
             exit 1
           fi
 
-      - name: Decide mode
-        id: mode
-        run: |
-          INPUT="${{ github.event.inputs.mode }}"
-          if [ "$INPUT" = "sample" ] || [ "$INPUT" = "live" ]; then
-            echo "mode=$INPUT" >> "$GITHUB_OUTPUT"
-          elif [ -n "$GOOGLE_MAPS_API_KEY" ]; then
-            echo "mode=live" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=sample" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: npm install --include=dev --no-audit --no-fund
 
       - name: Migrate database
         run: npm run migrate
 
-      - name: Discover leads (mode=${{ steps.mode.outputs.mode }})
-        run: npm run pipeline -- --mode=${{ steps.mode.outputs.mode }}
+      - name: Discover leads (mode=${{ github.event.inputs.mode || 'live' }})
+        run: npm run pipeline -- --mode=${{ github.event.inputs.mode || 'live' }}
 
       - name: Process outreach queue
         run: npm run outreach

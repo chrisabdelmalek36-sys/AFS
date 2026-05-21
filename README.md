@@ -1,91 +1,122 @@
-# AFS Lead Engine — Phase 2: Dashboard, Map & Route Planner
+# AFS Lead Engine
 
-The screen you actually use. It reads the **same database** the Phase 1
-engine fills, so everything you see here is real lead data.
+A single **Next.js 14** project that finds, tiers, and works real B2B leads
+for **AFS Trade** — the 33-year sole distributor of **Nardi** premium
+Italian outdoor furniture in Egypt.
 
-No Google key needed — the map uses free OpenStreetMap tiles, so you can
-click everything today with the practice data.
+Deploys to Vercel in one click. Runs the daily lead finder automatically
+on a free schedule. No paid APIs required out of the box.
 
----
+## What it does
 
-## Run it
+| | |
+|---|---|
+| **Discovers** real Egyptian businesses (hotels, resorts, restaurants, schools, universities, hospitals) from free **OpenStreetMap** + free news (GDELT) + optional Google Maps. |
+| **Dedupes** by phone-first hash so the same business never appears twice. |
+| **Tiers** every lead Platinum / Gold / Silver with an EGP deal estimate. |
+| **Generates outreach** across all channels: 5-step email sequence (Day 0/3/8/15/30) + WhatsApp pre-filled link + LinkedIn draft + door-to-door visit brief — by template, or via Claude when you add a key. |
+| **Sends emails** safely: simulated by default; real send only when both `RESEND_API_KEY` and `OUTREACH_LIVE_SEND=true` are set. |
+| **Compliance**: signed unsubscribe link on every cold email; opt-out is permanent and blocks the lead on every channel forever. |
+| **Plans visit routes** on a Google-Maps-style map: pick a region, get an optimised driving order, open it on your phone in Google Maps. |
+| **Daily digest** at 07:00 Africa/Cairo: new leads, follow-ups due, planned visits, hot news matches — emailed to you. |
+| **Automatic**: Vercel Cron runs the news + outreach + digest daily for free. Full OSM scan runs on deploy or via the optional GitHub Actions workflow. |
 
-Phase 1 must have run at least once (so the database has leads).
+## Six screens
+
+`/dashboard` · `/leads` · `/map` · `/lead/[id]` · `/outreach` · `/digest`
+
+## Run locally
 
 ```bash
-# 1. make sure the database has leads
-cd lead-engine && npm run dev             # migrate + sample leads
-cd ..
-
-# 2. start the dashboard
-cp .env.example .env                      # default points at the same DB
+cp .env.example .env.local                # at minimum set DATABASE_URL
 npm install
-npm run build && npm run start            # open http://localhost:3000
+npm run migrate                           # create tables
+npm run seed                              # do-not-contact demo entry
+npm run pipeline -- --mode=sample         # load 21 practice leads
+npm run pipeline -- --mode=live           # real Egyptian leads (free)
+npm run dev                               # open http://localhost:3000
 ```
 
-(For live editing use `npm run dev` instead of build/start.)
+## Useful npm scripts
 
----
-
-## The four screens
-
-| Page | What it does |
+| Script | What it does |
 |---|---|
-| **/dashboard** | New leads today, total, **pipeline value** (sum of deal estimates), follow-ups due, recent discovery runs + their cost. |
-| **/leads** | Every lead in a sortable table. Filter by tier, category, region, city, status, or search by name. Suppressed (do-not-contact) leads are greyed and clearly marked. |
-| **/map** | Every lead as a pin on the map of Egypt, **colored by tier** (purple = Platinum, amber = Gold, grey = Silver). Click a pin → jump to the lead. **Plan a visit route**: pick a region + number of stops → it orders them into an efficient driving loop and gives you an **"Open in Google Maps"** button that launches turn-by-turn navigation on your phone. |
-| **/lead/[id]** | Full detail, why it got its tier, contact history, **WhatsApp Mode 1** (opens WhatsApp with the message pre-typed — you press send), a **visit brief** (who to ask for, what to bring, 3 conversation openers tailored to the category), and a form to **log a contact / change status**. |
+| `npm run dev` | Start the dashboard in dev mode. |
+| `npm run build` | Production build. The `postbuild` hook auto-migrates, seeds, and loads real leads. |
+| `npm run start` | Serve the production build. |
+| `npm run migrate` | Apply all SQL migrations in `db/migrations/`. |
+| `npm run seed` | Insert the demo do-not-contact record. |
+| `npm run pipeline -- --mode=sample\|live` | Run discovery once. |
+| `npm run outreach` | Process the email sequence queue once. |
+| `npm run digest` | Build (and email) today's owner digest. |
+| `npm run estimate` | Show the projected cost of a live Google Maps day (OSM is free). |
+| `npm run leads` | Print everything in the database. |
+| `npm run cron` | Stay running and trigger discovery / outreach / digest on schedule (Africa/Cairo). |
 
----
+## Deploy to Vercel
 
-## Route planner — how it works without a Google key
+1. Create a Vercel project from this repo. Framework auto-detects as **Next.js**.
+2. Add a free **Neon Postgres** database via the Storage tab (sets `DATABASE_URL` automatically).
+3. Click **Deploy**. The `postbuild` hook runs migrations and populates real Egyptian leads from OpenStreetMap on first deploy.
+4. Vercel's built-in Cron runs `/api/cron/refresh` daily — free news refresh + outreach send + digest, no other configuration needed.
 
-- It orders your chosen stops with a nearest-neighbour algorithm (a good
-  driving loop) — runs locally, costs nothing.
-- It builds a normal Google Maps directions link. Tapping it opens the
-  Google Maps app and navigates — **no API key required to navigate.**
-- *Optional upgrade:* set `GOOGLE_MAPS_API_KEY` in `.env` and it will ask
-  Google for a fully optimised waypoint order instead. Everything still
-  works without it.
+Optional keys (set in **Vercel → Settings → Environment Variables**):
 
----
+| Key | What it unlocks |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude-personalised outreach drafts (otherwise: strong templates) |
+| `RESEND_API_KEY` + `OUTREACH_LIVE_SEND=true` | Actually send the email sequence (otherwise: simulated) |
+| `AFS_OWNER_EMAIL` | Where the daily 07:00 digest is sent |
+| `GOOGLE_MAPS_API_KEY` | Layer richer business data on top of OSM (also: route waypoint optimisation) |
+| `NEWSAPI_KEY` | Paid news tier (GDELT is free and always on) |
 
-## Status pipeline (Phase 4 foundation)
+## Layout
 
-Each lead moves: **New → Contacted → Replied → Meeting → Quote Sent →
-Closed Won / Closed Lost**. Logging a contact stamps the date; the
-dashboard automatically lists anything contacted 7+ days ago with no
-progress as a **follow-up due**.
+```
+.
+├── src/
+│   ├── app/                # Next.js routes (pages + API)
+│   ├── components/         # React components (map, UI)
+│   └── lib/
+│       ├── db.ts           # shared Postgres pool (q + query)
+│       ├── leads.ts        # dashboard data layer
+│       ├── outreach.ts     # Claude / template drafts
+│       ├── compliance.ts   # unsubscribe + email footer
+│       ├── route.ts        # nearest-neighbour route planner
+│       └── engine/         # lead discovery, sources, pipeline
+│           ├── config.ts   # geo zones, categories, env
+│           ├── pipeline.ts # discover → dedupe → enrich → tier → store
+│           ├── sender.ts   # email sequence processor
+│           ├── digest-builder.ts
+│           ├── quick-refresh.ts
+│           ├── sources/    # osmPlaces, googlePlaces, news, gov, sample
+│           ├── enrich/     # robots.txt + website scraping
+│           └── util/       # dedup, tiering, freshness, budget, logger
+├── scripts/                # tsx CLIs (migrate, seed, pipeline, …)
+├── db/migrations/          # idempotent SQL migrations (001–005)
+├── .github/workflows/
+│   └── lead-engine.yml     # daily scheduled full-scan job
+└── vercel.json             # Vercel build + cron schedule
+```
 
----
+## Compliance, baked in
 
-## Phase 3 — Outreach (built)
+- Egyptian Personal Data Protection Law 151/2020 friendly: never scrapes
+  personal-profile data, only public business listings + companies' own
+  websites.
+- `robots.txt` respected on every site we touch.
+- Every cold email carries a working, signed unsubscribe link + a physical
+  address.
+- Unsubscribing is permanent and suppresses the lead on **every** channel
+  forever.
+- Outreach auto-stops the moment the lead replies, advances in the
+  pipeline, or is suppressed.
 
-Open any lead → **Generate Outreach**. The system writes, per lead:
+## What's NOT free
 
-- **Email**: a 5-step sequence (Day 0 / 3 / 8 / 15 / 30), each with a
-  compliant footer (unsubscribe link + physical address).
-- **WhatsApp**: Mode 1 — opens WhatsApp with the message pre-typed.
-- **LinkedIn**: draft only (paste manually — protects your account).
-- **Visit**: a 1-page door-to-door brief.
-
-Drafts use **strong templates by default (no AI key, no cost)**. Add
-`ANTHROPIC_API_KEY` for Claude-personalised drafts — no code change.
-
-The **/outreach** page monitors every lead's sequence progress.
-
-**Safety, enforced:**
-
-- Emails only actually send when `RESEND_API_KEY` is set **and**
-  `OUTREACH_LIVE_SEND=true`. Otherwise every send is **simulated**
-  (nothing leaves) — so it is safe by default.
-- Every email carries a working, signed unsubscribe link. Unsubscribing
-  is permanent and blocks the lead on **every** channel forever.
-- The sequence auto-stops if the lead replies, advances, or is
-  suppressed. The engine worker processes the queue (`npm run outreach`,
-  or automatically via the daily worker).
-
-## What's next
-
-**Phase 4** — auto follow-up reminders and a 7 AM Cairo daily digest
-email. Phases 1–3 are complete and proven end-to-end on sample data.
+- **Google Maps API** (optional): Google requires a card on file even for
+  free-tier usage. The system runs perfectly without it on OpenStreetMap.
+- **Anthropic Claude** (optional): pay-as-you-go for AI-personalised
+  outreach copy. Strong templates work without a key.
+- **Resend** (optional): generous free tier for outbound email; only
+  needed if you flip `OUTREACH_LIVE_SEND=true`.

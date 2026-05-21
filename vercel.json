@@ -3,5 +3,19 @@
   "framework": "nextjs",
   "buildCommand": "npm install --include=dev --no-audit --no-fund && npm run build",
   "installCommand": "echo 'install handled by buildCommand'",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "crons": [
+    {
+      "path": "/api/cron/refresh",
+      "schedule": "0 4 * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/cron/refresh/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/lead/[id]/outreach/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }

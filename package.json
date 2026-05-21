@@ -1,17 +1,29 @@
 {
-  "name": "afs-dashboard",
-  "version": "0.1.0",
+  "name": "afs-latest",
+  "version": "1.0.0",
   "private": true,
+  "description": "AFS Lead Engine — daily B2B lead discovery, outreach & field routing for AFS Trade (Nardi distributor, Egypt). Single Next.js project.",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev",
     "build": "next build",
-    "postbuild": "cd lead-engine && npm install --include=dev --no-audit --no-fund && npm run migrate && npm run seed && npm run pipeline -- --mode=sample && npm run pipeline -- --mode=live && npm run digest || echo 'postbuild seed skipped'",
+    "postbuild": "npm run migrate && npm run seed && npm run pipeline -- --mode=sample && npm run pipeline -- --mode=live && npm run digest || echo 'postbuild seed skipped (likely missing DATABASE_URL — will run on first request)'",
     "start": "next start -p ${PORT:-3000}",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx scripts/migrate.ts",
+    "seed": "tsx scripts/seed.ts",
+    "pipeline": "tsx scripts/pipeline.ts",
+    "outreach": "tsx scripts/outreach.ts",
+    "digest": "tsx scripts/digest.ts",
+    "estimate": "tsx scripts/estimate.ts",
+    "leads": "tsx scripts/show-leads.ts",
+    "cron": "tsx scripts/cron.ts"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "leaflet": "^1.9.4",
     "next": "14.2.15",
+    "node-cron": "^3.0.3",
     "pg": "^8.13.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -20,12 +32,14 @@
   "devDependencies": {
     "@types/leaflet": "^1.9.12",
     "@types/node": "^22.10.2",
+    "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.11.10",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }
