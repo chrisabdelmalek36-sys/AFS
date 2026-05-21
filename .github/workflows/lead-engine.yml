@@ -1,0 +1,90 @@
+name: AFS Lead Engine — daily auto run
+
+# Runs the lead finder automatically every morning with NO server.
+# GitHub schedules it for free. Also runnable on demand from the
+# Actions tab ("Run workflow").
+#
+# NOTE: GitHub only runs scheduled workflows from the DEFAULT branch
+# (main). This file must live on main to fire on its own.
+#
+# Required repo secret:  DATABASE_URL  (your hosted Postgres URL)
+# Optional repo secrets (add to get REAL leads / live outreach):
+#   GOOGLE_MAPS_API_KEY, NEWSAPI_KEY, ANTHROPIC_API_KEY,
+#   RESEND_API_KEY, AFS_OWNER_EMAIL, AFS_FROM_EMAIL
+
+on:
+  schedule:
+    # 04:00 UTC ≈ early morning Cairo. Adjust if you like.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Pipeline mode (auto = live if a Google key secret is set)"
+        type: choice
+        default: auto
+        options: [auto, sample, live]
+
+concurrency:
+  group: lead-engine
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lead-engine
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      OUTREACH_LIVE_SEND: ${{ secrets.OUTREACH_LIVE_SEND }}
+      AFS_FROM_EMAIL: ${{ secrets.AFS_FROM_EMAIL }}
+      AFS_OWNER_EMAIL: ${{ secrets.AFS_OWNER_EMAIL }}
+      MONTHLY_BUDGET_USD: ${{ secrets.MONTHLY_BUDGET_USD }}
+      TZ: Africa/Cairo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Guard — DATABASE_URL must be set
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Add a DATABASE_URL repo secret (your hosted Postgres URL)."
+            exit 1
+          fi
+
+      - name: Decide mode
+        id: mode
+        run: |
+          INPUT="${{ github.event.inputs.mode }}"
+          if [ "$INPUT" = "sample" ] || [ "$INPUT" = "live" ]; then
+            echo "mode=$INPUT" >> "$GITHUB_OUTPUT"
+          elif [ -n "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "mode=live" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=sample" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Migrate database
+        run: npm run migrate
+
+      - name: Discover leads (mode=${{ steps.mode.outputs.mode }})
+        run: npm run pipeline -- --mode=${{ steps.mode.outputs.mode }}
+
+      - name: Process outreach queue
+        run: npm run outreach
+
+      - name: Build & send daily digest
+        run: npm run digest
+
+      - name: Summary
+        run: npm run leads
