@@ -10,9 +10,9 @@
 #                           needs a paid instance (~$7/mo); workers
 #                           cannot run on Render's free tier.
 #
-#  It runs SAMPLE data until you paste a GOOGLE_MAPS_API_KEY into the
-#  worker's Environment in the Render dashboard — then it automatically
-#  switches to REAL Egyptian leads. No code change.
+#  Real Egyptian leads come from OpenStreetMap — free, no key. Adding
+#  GOOGLE_MAPS_API_KEY in the Render dashboard layers Google data on
+#  top. No code change either way.
 # ─────────────────────────────────────────────────────────────────────
 databases:
   - name: afs-leads-db
@@ -28,16 +28,16 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    branch: claude/afs-lead-engine-Yi83k
+    branch: main
     buildCommand: >
       cd lead-engine && npm install --include=dev --no-audit --no-fund &&
-      cd ../dashboard && npm install --include=dev --no-audit --no-fund &&
+      cd .. && npm install --include=dev --no-audit --no-fund &&
       npm run build
     # On first boot, set up the DB + a sample so the site is never empty.
     startCommand: >
       cd lead-engine &&
       (npm run migrate && npm run seed && npm run pipeline -- --mode=sample && npm run digest || true) &&
-      cd ../dashboard && npm run start
+      cd .. && npm run start
     healthCheckPath: /
     envVars:
       - key: DATABASE_URL
@@ -59,7 +59,7 @@ services:
     runtime: node
     plan: starter            # workers require a paid plan (~$7/mo)
     region: frankfurt
-    branch: claude/afs-lead-engine-Yi83k
+    branch: main
     buildCommand: >
       cd lead-engine && npm install --include=dev --no-audit --no-fund
     # Migrate, then run forever: daily discovery 06:00, outreach queue
@@ -75,15 +75,15 @@ services:
         value: "22"
       - key: NPM_CONFIG_PRODUCTION
         value: "false"
-      # 'auto' = live as soon as a Google key is present, else sample.
+      # 'auto' / unset = live (OSM works without keys).
       - key: PIPELINE_MODE
-        value: auto
+        value: live
       - key: MONTHLY_BUDGET_USD
         value: "200"
       - key: TZ
         value: Africa/Cairo
-      # Paste these in the Render dashboard when ready (optional):
-      - key: GOOGLE_MAPS_API_KEY   # ← add this to get REAL leads
+      # Paste these in the Render dashboard when ready (all optional):
+      - key: GOOGLE_MAPS_API_KEY   # ← add this to layer Google leads on top of OSM
         sync: false
       - key: NEWSAPI_KEY
         sync: false

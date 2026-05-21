@@ -1,5 +1,31 @@
 {
+  "name": "afs-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "postbuild": "cd lead-engine && npm install --include=dev --no-audit --no-fund && npm run migrate && npm run seed && npm run pipeline -- --mode=sample && npm run pipeline -- --mode=live && npm run digest || echo 'postbuild seed skipped'",
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "next": "14.2.15",
+    "pg": "^8.13.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1"
+  },
   "devDependencies": {
-    "localtunnel": "^2.0.2"
+    "@types/leaflet": "^1.9.12",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.7.2"
   }
 }
