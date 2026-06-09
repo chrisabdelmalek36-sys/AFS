@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listLeads, distinctValues, STATUSES } from "@/lib/leads";
 import { Card, TierBadge, StatusBadge, egp } from "@/components/ui";
+import ContactCell from "@/components/ContactCell";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,7 @@ export default async function LeadsPage({
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
               <th className="px-4 py-2">Name</th>
+              <th className="px-4 py-2">Contact / LinkedIn</th>
               <th className="px-4 py-2">Tier</th>
               <th className="px-4 py-2">Category</th>
               <th className="px-4 py-2">City / Region</th>
@@ -113,6 +115,20 @@ export default async function LeadsPage({
                   )}
                 </td>
                 <td className="px-4 py-2">
+                  {l.suppressed ? (
+                    <span className="text-xs text-slate-400">—</span>
+                  ) : (
+                    <ContactCell
+                      id={l.id}
+                      companyName={l.name}
+                      city={l.city}
+                      contactPerson={l.contact_person}
+                      linkedinUrl={l.linkedin_url}
+                      verified={l.contact_verified}
+                    />
+                  )}
+                </td>
+                <td className="px-4 py-2">
                   <TierBadge tier={l.tier} />
                 </td>
                 <td className="px-4 py-2 text-slate-600">{l.category ?? "—"}</td>
@@ -130,8 +146,8 @@ export default async function LeadsPage({
             ))}
             {leads.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                  No leads match. Run the engine: <code>cd lead-engine &amp;&amp; npm run dev</code>
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                  No leads yet. Open the Dashboard and click <b>Find real leads</b>.
                 </td>
               </tr>
             )}
