@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { dashboardSummary } from "@/lib/leads";
 import { Card, TierBadge, StatusBadge, egp } from "@/components/ui";
+import ScanButton from "@/components/ScanButton";
 
 export const dynamic = "force-dynamic";
 
@@ -9,11 +10,14 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-slate-500">
-          Today&apos;s discovery, pipeline value and follow-ups due.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-slate-500">
+            Today&apos;s discovery, pipeline value and follow-ups due.
+          </p>
+        </div>
+        <ScanButton />
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">

@@ -6,13 +6,13 @@ import type { DiscoverContext, RawLead, Source } from "./types";
 // across Egypt (hotels, resorts, restaurants, schools, universities,
 // hospitals, etc.) by tags. The same kind of data Google Maps has, just
 // crowd-sourced.
-const OVERPASS_URL =
+export const OVERPASS_URL =
   process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
 
 interface OsmTags {
   [k: string]: string;
 }
-interface OsmElement {
+export interface OsmElement {
   type: "node" | "way" | "relation";
   id: number;
   lat?: number;
@@ -21,12 +21,12 @@ interface OsmElement {
   tags?: OsmTags;
 }
 
-interface CategoryQuery {
+export interface CategoryQuery {
   key: string; // matches our config.CATEGORIES[].key
   selectors: string[]; // OSM tag selectors
 }
 
-const CATEGORY_QUERIES: CategoryQuery[] = [
+export const CATEGORY_QUERIES: CategoryQuery[] = [
   { key: "hotel",       selectors: ['"tourism"="hotel"', '"tourism"="motel"'] },
   { key: "resort",      selectors: ['"tourism"="resort"', '"leisure"="resort"'] },
   { key: "restaurant",  selectors: ['"amenity"="restaurant"'] },
@@ -40,12 +40,18 @@ const CATEGORY_QUERIES: CategoryQuery[] = [
   { key: "interior_design", selectors: ['"shop"="interior_decoration"'] },
 ];
 
-function buildQuery(lat: number, lng: number, radiusM: number, sels: string[]): string {
+export function buildQuery(
+  lat: number,
+  lng: number,
+  radiusM: number,
+  sels: string[],
+  timeoutS = 30,
+): string {
   const around = `(around:${radiusM},${lat},${lng})`;
   const lines = sels
     .flatMap((s) => [`node[${s}]${around};`, `way[${s}]${around};`])
     .join("");
-  return `[out:json][timeout:30];(${lines});out center tags 200;`;
+  return `[out:json][timeout:${timeoutS}];(${lines});out center tags 200;`;
 }
 
 function tagOr(t: OsmTags | undefined, ...keys: string[]): string | undefined {
@@ -54,7 +60,7 @@ function tagOr(t: OsmTags | undefined, ...keys: string[]): string | undefined {
   return undefined;
 }
 
-function toLead(el: OsmElement, categoryKey: string, region: string): RawLead | null {
+export function toLead(el: OsmElement, categoryKey: string, region: string): RawLead | null {
   const t = el.tags ?? {};
   const name = t["name:en"] ?? t["name"];
   if (!name) return null;
