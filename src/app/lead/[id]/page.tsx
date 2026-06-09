@@ -11,6 +11,7 @@ import { q } from "@/lib/db";
 import { generateOutreach } from "@/lib/outreach";
 import { Card, TierBadge, StatusBadge, egp } from "@/components/ui";
 import { visitBrief, whatsappDraft } from "@/lib/brief";
+import ContactPanel from "@/components/ContactPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -143,7 +144,8 @@ export default async function LeadPage({
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Details" className="lg:col-span-1">
+        <div className="space-y-4 lg:col-span-1">
+        <Card title="Details">
           <dl className="space-y-2 text-sm">
             <Row k="Category" v={`${lead.category ?? "—"} ${lead.sub_category ? `(${lead.sub_category})` : ""}`} />
             <Row k="Address" v={lead.address ?? "—"} />
@@ -164,6 +166,19 @@ export default async function LeadPage({
             </a>
           )}
         </Card>
+
+        <Card title="Contact person">
+          <ContactPanel
+            id={lead.id}
+            companyName={lead.name}
+            city={lead.city}
+            contactPerson={lead.contact_person}
+            contactTitle={lead.contact_title}
+            linkedinUrl={lead.linkedin_url}
+            verified={lead.contact_verified}
+          />
+        </Card>
+        </div>
 
         <Card title="Outreach" className="lg:col-span-2">
           {lead.suppressed ? (

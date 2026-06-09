@@ -27,6 +27,10 @@ export interface Lead {
   phone_norm: string | null;
   website: string | null;
   email: string | null;
+  contact_person: string | null;
+  contact_title: string | null;
+  linkedin_url: string | null;
+  contact_verified: boolean;
   tier: string | null;
   tier_reason: string | null;
   est_deal_min_egp: string | null;
@@ -91,6 +95,33 @@ export async function listLeads(f: LeadFilter = {}): Promise<Lead[]> {
 export async function getLead(id: number): Promise<Lead | null> {
   const r = await q<Lead>(`SELECT * FROM leads WHERE id=$1`, [id]);
   return r[0] ?? null;
+}
+
+export interface ContactPatch {
+  contact_person?: string | null;
+  contact_title?: string | null;
+  linkedin_url?: string | null;
+  contact_verified?: boolean;
+}
+
+// Saves the user's manual people-enrichment edits. Only the fields present in
+// the patch are touched, so editing one cell never clears the others.
+export async function updateLeadContact(
+  id: number,
+  patch: ContactPatch,
+): Promise<void> {
+  const sets: string[] = [];
+  const params: unknown[] = [id];
+  const add = (col: string, val: unknown) => {
+    params.push(val);
+    sets.push(`${col} = $${params.length}`);
+  };
+  if ("contact_person" in patch) add("contact_person", patch.contact_person || null);
+  if ("contact_title" in patch) add("contact_title", patch.contact_title || null);
+  if ("linkedin_url" in patch) add("linkedin_url", patch.linkedin_url || null);
+  if ("contact_verified" in patch) add("contact_verified", !!patch.contact_verified);
+  if (sets.length === 0) return;
+  await q(`UPDATE leads SET ${sets.join(", ")} WHERE id=$1`, params);
 }
 
 export async function distinctValues(): Promise<{
