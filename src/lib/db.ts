@@ -15,11 +15,20 @@ const g = globalThis as unknown as { _pgPool?: pg.Pool };
 export const pool = g._pgPool ?? new pg.Pool({ connectionString: url });
 if (process.env.NODE_ENV !== "production") g._pgPool = pool;
 
+// Lazily import to avoid a load-time cycle (bootstrap imports `pool` above).
+// Skip during the bootstrap itself, otherwise its own queries would await the
+// promise that is awaiting them.
+async function ready(): Promise<void> {
+  const { ensureReady, isBootstrapping } = await import("./bootstrap");
+  if (!isBootstrapping()) await ensureReady();
+}
+
 /** Dashboard-style helper: returns rows directly. */
 export async function q<T = Record<string, unknown>>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
+  await ready();
   const r = await pool.query(text, params as never[]);
   return r.rows as T[];
 }
@@ -29,6 +38,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params: unknown[] = [],
 ): Promise<QueryResult<T>> {
+  await ready();
   return pool.query<T>(text, params as never[]);
 }
 
