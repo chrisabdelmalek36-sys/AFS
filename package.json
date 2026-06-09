@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "npm run migrate && npm run seed && npm run pipeline -- --mode=sample && npm run pipeline -- --mode=live && npm run digest || echo 'postbuild seed skipped (likely missing DATABASE_URL — will run on first request)'",
     "start": "next start -p ${PORT:-3000}",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",

@@ -86,10 +86,14 @@ export interface QuickRefreshResult {
   updated: number;
   outreach: { due: number; sent: number; simulated: number; skipped: number };
   digest: { status: string; to: string };
+  scan?: { zone: string; inserted: number; progressPct: number };
 }
 
 export async function quickRefresh(): Promise<QuickRefreshResult> {
   log.step("Quick refresh");
+  // Whole cron call must fit Vercel's 60s ceiling; leftover time goes to
+  // advancing the OSM business scan below.
+  const deadline = Date.now() + 50_000;
 
   // Lightweight run record so we have an audit trail.
   const run = await query<{ id: number }>(
@@ -116,11 +120,24 @@ export async function quickRefresh(): Promise<QuickRefreshResult> {
   const outreach = await processOutreachQueue();
   const digest = await runDigest();
 
+  // Spend whatever time is left advancing the resumable OSM business scan,
+  // so real leads keep arriving daily even if nobody clicks the button.
+  let scan: QuickRefreshResult["scan"];
+  if (deadline - Date.now() > 15_000) {
+    try {
+      const { scanStep } = await import("./zone-scan");
+      const s = await scanStep(deadline);
+      scan = { zone: s.zoneLabel, inserted: s.inserted, progressPct: s.progressPct };
+    } catch (e) {
+      log.warn("zone scan step failed:", e);
+    }
+  }
+
   await query(
     `UPDATE crawl_runs
         SET finished_at=now(), status='ok',
             stats=$2 WHERE id=$1`,
-    [runId, JSON.stringify({ newsItems: raw.length, inserted, updated })],
+    [runId, JSON.stringify({ newsItems: raw.length, inserted, updated, scan })],
   );
 
   return {
@@ -129,5 +146,6 @@ export async function quickRefresh(): Promise<QuickRefreshResult> {
     updated,
     outreach,
     digest: { status: digest.status, to: digest.to },
+    scan,
   };
 }

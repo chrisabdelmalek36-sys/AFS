@@ -10,6 +10,9 @@
     "src/app/api/cron/refresh/route.ts": {
       "maxDuration": 60
     },
+    "src/app/api/scan/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/lead/[id]/outreach/route.ts": {
       "maxDuration": 60
     }
