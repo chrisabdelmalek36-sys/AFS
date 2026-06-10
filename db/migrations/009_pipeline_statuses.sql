@@ -1,6 +1,8 @@
--- Expand the lead status pipeline to the full set used across the app.
--- Keep in sync with src/lib/statuses.ts. All previously-allowed values are
--- retained, so existing rows stay valid.
+-- The SINGLE source of the chk_status constraint. Always lists the FULL set
+-- of allowed statuses, because the bootstrap re-runs every migration on each
+-- cold start — a partial list here would reject rows already on newer statuses
+-- and break startup. To add/rename a status: edit THIS list and
+-- src/lib/statuses.ts (no new constraint migration needed).
 ALTER TABLE leads DROP CONSTRAINT IF EXISTS chk_status;
 ALTER TABLE leads ADD CONSTRAINT chk_status CHECK (status IN (
   'New','Contacted','Waiting for reply','Replied','Meeting',
