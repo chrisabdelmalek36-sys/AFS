@@ -1,17 +1,16 @@
-import { config, GEO_ZONES } from "./config";
+import { GEO_ZONES } from "./config";
 import { query } from "../db";
 import { log } from "./util/logger";
 import { ingestRawLeads } from "./ingest";
 import {
-  OVERPASS_URL,
   CATEGORY_QUERIES,
   buildQuery,
   buildMultiQuery,
   nameSelector,
   toLead,
-  type OsmElement,
 } from "./sources/osmPlaces";
 import { nearestArea } from "../areas";
+import { overpassFetch } from "./util/overpass";
 import type { RawLead } from "./sources/types";
 
 // Resumable OSM discovery that fits inside Vercel's 60s function ceiling.
@@ -90,29 +89,16 @@ export async function scanStep(deadline: number): Promise<ScanStepResult> {
   ) {
     const z = zones[cur.zone]!;
     const cq = CATEGORY_QUERIES[cur.cat]!;
-    const body = `data=${encodeURIComponent(
-      buildQuery(z.lat, z.lng, z.radiusM, cq.selectors, 12),
-    )}`;
     try {
-      const r = await fetch(OVERPASS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": config.enrich.userAgent,
-        },
-        body,
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (r.ok) {
-        const j = (await r.json()) as { elements?: OsmElement[] };
-        for (const el of j.elements ?? []) {
-          const lead = toLead(el, cq.key, z.region);
-          if (lead) raw.push(lead);
-        }
-        queries++;
-      } else {
-        log.warn(`Overpass ${r.status} for ${z.key}/${cq.key}`);
+      const elements = await overpassFetch(
+        buildQuery(z.lat, z.lng, z.radiusM, cq.selectors, 12),
+        { perTryMs: 12_000, deadline },
+      );
+      for (const el of elements) {
+        const lead = toLead(el, cq.key, z.region);
+        if (lead) raw.push(lead);
       }
+      queries++;
     } catch (e) {
       log.warn(`Overpass failed (${z.key}/${cq.key}):`, e);
     }
@@ -176,6 +162,8 @@ export interface TargetedResult {
   categories: string[];
   custom: string[];
   queries: number;
+  attempted: number;   // total category/keyword jobs
+  failed: number;      // jobs where every Overpass mirror was unavailable
   rawCount: number;
   inserted: number;
   updated: number;
@@ -216,38 +204,27 @@ export async function targetedScan(opts: {
 
   const raw: RawLead[] = [];
   let queries = 0;
+  let failed = 0;
   for (const job of jobs) {
     if (Date.now() > opts.deadline - 8_000) break;
-    const body = `data=${encodeURIComponent(
-      buildMultiQuery(centers, job.selectors, 25),
-    )}`;
     try {
-      const r = await fetch(OVERPASS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": config.enrich.userAgent,
-        },
-        body,
-        signal: AbortSignal.timeout(28_000),
-      });
-      if (r.ok) {
-        const j = (await r.json()) as { elements?: OsmElement[] };
-        for (const el of j.elements ?? []) {
-          const lat = el.lat ?? el.center?.lat;
-          const lng = el.lon ?? el.center?.lon;
-          const region =
-            (lat != null && lng != null ? nearestArea(lat, lng)?.group : null) ??
-            fallbackGroup ??
-            "Egypt";
-          const lead = toLead(el, job.key, region);
-          if (lead) raw.push(lead);
-        }
-        queries++;
-      } else {
-        log.warn(`Overpass ${r.status} for targeted/${job.key}`);
+      const elements = await overpassFetch(
+        buildMultiQuery(centers, job.selectors, 25),
+        { perTryMs: 16_000, deadline: opts.deadline },
+      );
+      for (const el of elements) {
+        const lat = el.lat ?? el.center?.lat;
+        const lng = el.lon ?? el.center?.lon;
+        const region =
+          (lat != null && lng != null ? nearestArea(lat, lng)?.group : null) ??
+          fallbackGroup ??
+          "Egypt";
+        const lead = toLead(el, job.key, region);
+        if (lead) raw.push(lead);
       }
+      queries++;
     } catch (e) {
+      failed++;
       log.warn(`Overpass failed (targeted/${job.key}):`, e);
     }
     await new Promise((res) => setTimeout(res, 250));
@@ -272,6 +249,8 @@ export async function targetedScan(opts: {
     categories: opts.categories,
     custom: customKeywords,
     queries,
+    attempted: jobs.length,
+    failed,
     ...stats,
   };
 }

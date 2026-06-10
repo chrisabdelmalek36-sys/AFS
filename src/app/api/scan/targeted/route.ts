@@ -50,7 +50,11 @@ export async function POST(req: Request) {
       custom,
       deadline: Date.now() + 50_000,
     });
-    return NextResponse.json({ ok: true, ...result });
+    const found = result.inserted + result.updated;
+    // If we found nothing AND every query failed, OSM was unreachable — say so
+    // instead of implying there were simply no businesses.
+    const busy = found === 0 && result.attempted > 0 && result.failed >= result.attempted;
+    return NextResponse.json({ ok: true, busy, ...result });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "unknown" },
