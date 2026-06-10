@@ -1,12 +1,15 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import { useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
   CircleMarker,
+  Circle,
   Popup,
   Polyline,
+  useMap,
 } from "react-leaflet";
 import Link from "next/link";
 import { TIER_COLORS } from "@/components/ui";
@@ -21,12 +24,31 @@ export interface MapLead {
   category: string | null;
 }
 
+export interface MapFocus {
+  lat: number;
+  lng: number;
+  zoom: number;
+  radiusKm?: number; // draws the area boundary when set
+}
+
+// Imperative bridge: react-leaflet only reads center/zoom on mount, so an
+// area selection after mount needs an explicit flyTo.
+function FlyTo({ focus }: { focus: MapFocus | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (focus) map.flyTo([focus.lat, focus.lng], focus.zoom, { duration: 0.8 });
+  }, [focus, map]);
+  return null;
+}
+
 export default function LeafletMap({
   leads,
   route,
+  focus = null,
 }: {
   leads: MapLead[];
   route: { lat: number; lng: number }[];
+  focus?: MapFocus | null;
 }) {
   const center: [number, number] =
     leads.length > 0 ? [leads[0]!.lat, leads[0]!.lng] : [27.5, 31.0];
@@ -38,6 +60,7 @@ export default function LeafletMap({
       scrollWheelZoom
       className="h-full w-full"
     >
+      <FlyTo focus={focus} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -76,6 +99,19 @@ export default function LeafletMap({
         <Polyline
           positions={route.map((p) => [p.lat, p.lng] as [number, number])}
           pathOptions={{ color: "#7c3aed", weight: 4, opacity: 0.8 }}
+        />
+      )}
+      {focus?.radiusKm && (
+        <Circle
+          center={[focus.lat, focus.lng]}
+          radius={focus.radiusKm * 1000}
+          pathOptions={{
+            color: "#7c3aed",
+            weight: 1.5,
+            fillColor: "#7c3aed",
+            fillOpacity: 0.05,
+            dashArray: "6 6",
+          }}
         />
       )}
     </MapContainer>
