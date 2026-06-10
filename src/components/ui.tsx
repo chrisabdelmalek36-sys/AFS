@@ -1,21 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { STATUS_COLORS } from "@/lib/statuses";
+
+export { STATUS_COLORS };
 
 export const TIER_COLORS: Record<string, string> = {
   Platinum: "#7c3aed",
   Gold: "#d97706",
   Silver: "#64748b",
   Unrated: "#94a3b8",
-};
-
-export const STATUS_COLORS: Record<string, string> = {
-  New: "#0ea5e9",
-  Contacted: "#6366f1",
-  Replied: "#a855f7",
-  Meeting: "#f59e0b",
-  "Quote Sent": "#f97316",
-  "Closed Won": "#16a34a",
-  "Closed Lost": "#dc2626",
 };
 
 export function TierBadge({ tier }: { tier: string | null }) {

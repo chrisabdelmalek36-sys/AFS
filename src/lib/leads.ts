@@ -49,13 +49,15 @@ export interface Lead {
   suppressed_reason: string | null;
 }
 
-export const STATUSES = [
-  "New", "Contacted", "Replied", "Meeting",
-  "Quote Sent", "Postponed", "Closed Won", "Closed Lost",
-] as const;
-
-// Leads still needing first action (shown on the map / route planner).
-export const ACTIONABLE_STATUS = "New";
+// Pipeline statuses & priorities live in one pure module (also used by the
+// DB constraint and client components); re-exported here for existing imports.
+export {
+  STATUSES,
+  ACTIONABLE_STATUS,
+  PRIORITIES,
+  EMAIL_STATUSES,
+} from "./statuses";
+import { STATUSES, PRIORITIES, EMAIL_STATUSES, ACTIVE_STATUSES, IN_PROGRESS_STATUSES } from "./statuses";
 
 export interface LeadFilter {
   tier?: string;
@@ -99,10 +101,6 @@ export async function getLead(id: number): Promise<Lead | null> {
   const r = await q<Lead>(`SELECT * FROM leads WHERE id=$1`, [id]);
   return r[0] ?? null;
 }
-
-// The Notion-style Priority options.
-export const PRIORITIES = ["Hot", "High", "Standard"] as const;
-export const EMAIL_STATUSES = ["Valid", "Catch-all"] as const;
 
 export interface ContactPatch {
   contact_person?: string | null;
@@ -209,7 +207,7 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
   const followupsDue = await q<Lead>(
     `SELECT * FROM leads
       WHERE NOT suppressed
-        AND status IN ('Contacted','Replied','Meeting','Quote Sent','Postponed')
+        AND status = ANY($1)
         AND (
           (follow_up_at IS NOT NULL AND follow_up_at <= now())
           OR (follow_up_at IS NULL AND (last_contacted_at IS NULL
@@ -217,6 +215,7 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
         )
       ORDER BY follow_up_at NULLS FIRST, last_contacted_at NULLS FIRST
       LIMIT 25`,
+    [IN_PROGRESS_STATUSES],
   );
   const recentRuns = await q<{
     id: number; mode: string; status: string;
@@ -326,11 +325,12 @@ export async function whatsappFollowupsDue(): Promise<WhatsAppDue[]> {
       WHERE m.channel='whatsapp' AND m.status='scheduled'
         AND m.scheduled_for <= now()
         AND NOT l.suppressed
-        AND l.status IN ('New','Contacted')
+        AND l.status = ANY($1)
       ORDER BY CASE l.tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
                            WHEN 'Silver' THEN 2 ELSE 3 END,
                m.scheduled_for
       LIMIT 100`,
+    [ACTIVE_STATUSES],
   );
 }
 

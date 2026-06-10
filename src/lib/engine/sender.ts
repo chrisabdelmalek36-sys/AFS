@@ -1,11 +1,7 @@
 import { config } from "./config";
 import { query } from "../db";
 import { log } from "./util/logger";
-
-// Sequence stops the moment a lead engages or opts out.
-const STOP_STATUSES = [
-  "Replied", "Meeting", "Quote Sent", "Postponed", "Closed Won", "Closed Lost",
-];
+import { STOP_STATUSES } from "../statuses";
 
 interface DueRow {
   id: number;
