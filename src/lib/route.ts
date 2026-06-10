@@ -19,6 +19,14 @@ function haversineKm(a: RouteStop, b: RouteStop): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// Total distance along an explicit stop order (used when the user has
+// reordered stops manually and we must NOT re-optimise).
+export function pathDistance(stops: RouteStop[]): number {
+  let d = 0;
+  for (let i = 1; i < stops.length; i++) d += haversineKm(stops[i - 1]!, stops[i]!);
+  return Math.round(d * 10) / 10;
+}
+
 // Nearest-neighbour ordering from the first stop. Good enough for a
 // door-to-door day route and needs no API key.
 export function nearestNeighbour(stops: RouteStop[]): {
