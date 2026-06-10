@@ -87,9 +87,20 @@ export async function ingestRawLeads(
   raw: RawLead[],
   opts: { enrich: boolean },
 ): Promise<IngestStats> {
-  const merged = mergeBatch(raw).filter((m) =>
+  let merged = mergeBatch(raw).filter((m) =>
     isRelevantBusiness(m.name, m.category),
   );
+  // Never resurrect a lead the user explicitly deleted.
+  if (merged.length > 0) {
+    const del = await query<{ dedup_hash: string }>(
+      `SELECT dedup_hash FROM deleted_leads WHERE dedup_hash = ANY($1)`,
+      [merged.map((m) => m.hash)],
+    );
+    if (del.rowCount) {
+      const blocked = new Set(del.rows.map((r) => r.dedup_hash));
+      merged = merged.filter((m) => !blocked.has(m.hash));
+    }
+  }
   log.info(`After dedupe + relevance: ${merged.length} unique leads`);
 
   let inserted = 0,
