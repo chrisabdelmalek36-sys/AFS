@@ -53,7 +53,7 @@ export async function runPipeline(mode = config.mode): Promise<RunResult> {
   log.info(`Discovered ${raw.length} raw leads from ${sources.length} source(s)`);
 
   // 2. Dedupe + enrich + tier + store (shared with the zone scanner).
-  const stats = await ingestRawLeads(raw, { enrich: mode === "live" });
+  const { stats } = await ingestRawLeads(raw, { enrich: mode === "live" });
 
   const status = budget.remaining() <= 0 ? "budget_capped" : "ok";
   await query(

@@ -33,6 +33,13 @@ export default function TargetedSearch({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    inserted: number;
+    updated: number;
+    areas: string[];
+    breakdown: { category: string; n: number }[];
+    ids: number[];
+  } | null>(null);
 
   const toggle = (key: string) =>
     setPicked((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]));
@@ -64,6 +71,7 @@ export default function TargetedSearch({
     setBusy(true);
     setErr(null);
     setNote(null);
+    setResult(null);
     try {
       const res = await fetch("/api/scan/targeted", {
         method: "POST",
@@ -74,22 +82,38 @@ export default function TargetedSearch({
       if (!res.ok) throw new Error(data.error ?? "Search failed");
       const found = (data.inserted ?? 0) + (data.updated ?? 0);
       if (found > 0) {
-        // Drop the results straight onto the map, framed to the chosen areas.
-        router.push(`/map?areas=${encodeURIComponent(areaKeys.join(","))}`);
+        // Show the response first; the user opens the map when ready.
+        setResult({
+          inserted: data.inserted ?? 0,
+          updated: data.updated ?? 0,
+          areas: data.areas ?? [],
+          breakdown: data.breakdown ?? [],
+          ids: data.ids ?? [],
+        });
       } else if (data.busy) {
         setErr(
           "OpenStreetMap is busy right now and didn't respond. Please wait a few seconds and try again — your selection is kept.",
         );
-        setBusy(false);
       } else {
         setNote(
           "No new matches in that area for those types. Tip: try broader types (e.g. Restaurant, Cafe), add a custom type, or pick a nearby/larger area. Leads already found before won't be re-added.",
         );
-        setBusy(false);
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Search failed");
+    } finally {
       setBusy(false);
+    }
+  }
+
+  function openOnMap() {
+    if (!result) return;
+    // Show ONLY this search's leads on the map (by id). Fall back to area
+    // framing if the id list is unusually large for a URL.
+    if (result.ids.length > 0 && result.ids.length <= 600) {
+      router.push(`/map?ids=${result.ids.join(",")}`);
+    } else {
+      router.push(`/map?areas=${encodeURIComponent(areaKeys.join(","))}`);
     }
   }
 
@@ -246,6 +270,47 @@ export default function TargetedSearch({
 
       {err && <p className="text-sm text-rose-600">{err}</p>}
       {note && <p className="text-sm text-amber-600">{note}</p>}
+
+      {result && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-base font-semibold text-emerald-800">
+            ✓ Found {result.ids.length} matching business
+            {result.ids.length === 1 ? "" : "es"}
+            {result.areas.length ? ` in ${result.areas.join(", ")}` : ""}
+          </p>
+          <p className="mt-0.5 text-sm text-emerald-700">
+            {result.inserted} new · {result.updated} already in your list
+          </p>
+
+          {result.breakdown.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {result.breakdown.map((b) => (
+                <span
+                  key={b.category}
+                  className="rounded-full bg-white px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                >
+                  {b.category}: <b>{b.n}</b>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={openOnMap}
+              className="rounded-md bg-emerald-600 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Show these {result.ids.length} on the map →
+            </button>
+            <button
+              onClick={() => setResult(null)}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Search again
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

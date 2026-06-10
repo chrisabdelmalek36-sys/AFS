@@ -113,7 +113,7 @@ export async function scanStep(deadline: number): Promise<ScanStepResult> {
     await new Promise((res) => setTimeout(res, 250));
   }
 
-  const stats = await ingestRawLeads(raw, { enrich: false });
+  const { stats } = await ingestRawLeads(raw, { enrich: false });
 
   const done = cur.zone >= zones.length;
   await saveCursor(done ? { zone: 0, cat: 0 } : cur);
@@ -168,6 +168,8 @@ export interface TargetedResult {
   inserted: number;
   updated: number;
   suppressed: number;
+  ids: number[];
+  breakdown: { category: string; n: number }[];
 }
 
 export async function targetedScan(opts: {
@@ -230,7 +232,7 @@ export async function targetedScan(opts: {
     await new Promise((res) => setTimeout(res, 250));
   }
 
-  const stats = await ingestRawLeads(raw, { enrich: false });
+  const { stats, ids } = await ingestRawLeads(raw, { enrich: false });
   if (queries > 0) {
     await query(
       `INSERT INTO api_usage (run_id, provider, calls, est_cost_usd)
@@ -244,6 +246,19 @@ export async function targetedScan(opts: {
     [runId, JSON.stringify({ areas: areaLabels, queries, ...stats })],
   );
 
+  // What did we actually land? Group the matched leads by type for the
+  // result summary the user sees before opening the map.
+  let breakdown: { category: string; n: number }[] = [];
+  if (ids.length > 0) {
+    breakdown = (
+      await query<{ category: string; n: string }>(
+        `SELECT COALESCE(category,'other') category, COUNT(*) n
+           FROM leads WHERE id = ANY($1) GROUP BY 1 ORDER BY 2 DESC`,
+        [ids],
+      )
+    ).rows.map((r) => ({ category: r.category, n: Number(r.n) }));
+  }
+
   return {
     areas: areaLabels,
     categories: opts.categories,
@@ -252,5 +267,7 @@ export async function targetedScan(opts: {
     attempted: jobs.length,
     failed,
     ...stats,
+    ids,
+    breakdown,
   };
 }
