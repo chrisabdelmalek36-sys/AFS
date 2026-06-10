@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { outreachQueue } from "@/lib/leads";
-import { Card, TierBadge, StatusBadge } from "@/components/ui";
+import { Card, TierBadge } from "@/components/ui";
+import StatusSelect from "@/components/StatusSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +83,7 @@ export default async function OutreachPage() {
                   <TierBadge tier={r.tier} />
                 </td>
                 <td className="px-4 py-2">
-                  <StatusBadge status={r.status} />
+                  <StatusSelect id={r.id} status={r.status} disabled={r.suppressed} />
                 </td>
                 <td className="px-4 py-2 text-slate-600">
                   {r.outreach_generated_at ? (

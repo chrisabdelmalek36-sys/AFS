@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { listLeads, distinctValues, STATUSES } from "@/lib/leads";
-import { Card, TierBadge, StatusBadge, egp } from "@/components/ui";
+import { Card, TierBadge, egp } from "@/components/ui";
 import ContactCell from "@/components/ContactCell";
+import StatusSelect from "@/components/StatusSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -140,7 +141,7 @@ export default async function LeadsPage({
                 </td>
                 <td className="px-4 py-2 text-slate-600">{l.freshness}</td>
                 <td className="px-4 py-2">
-                  <StatusBadge status={l.status} />
+                  <StatusSelect id={l.id} status={l.status} disabled={l.suppressed} />
                 </td>
               </tr>
             ))}

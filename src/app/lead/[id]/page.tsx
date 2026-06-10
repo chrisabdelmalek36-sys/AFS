@@ -116,11 +116,15 @@ export default async function LeadPage({
           <div className="flex flex-wrap gap-2">
             {[
               { s: "Contacted", d: 0, c: "bg-indigo-600 hover:bg-indigo-700" },
-              { s: "Postponed", d: 14, c: "bg-amber-600 hover:bg-amber-700" },
-              { s: "Meeting", d: 0, c: "bg-orange-600 hover:bg-orange-700" },
-              { s: "Quote Sent", d: 0, c: "bg-fuchsia-600 hover:bg-fuchsia-700" },
+              { s: "Waiting for reply", d: 0, c: "bg-yellow-600 hover:bg-yellow-700" },
+              { s: "Replied", d: 0, c: "bg-purple-600 hover:bg-purple-700" },
+              { s: "Meeting", d: 0, c: "bg-amber-600 hover:bg-amber-700" },
+              { s: "Quote Sent", d: 0, c: "bg-orange-600 hover:bg-orange-700" },
+              { s: "Negotiation", d: 0, c: "bg-teal-600 hover:bg-teal-700" },
+              { s: "Postponed", d: 14, c: "bg-slate-600 hover:bg-slate-700" },
               { s: "Closed Won", d: 0, c: "bg-emerald-600 hover:bg-emerald-700" },
               { s: "Closed Lost", d: 0, c: "bg-rose-600 hover:bg-rose-700" },
+              { s: "Not Interested", d: 0, c: "bg-gray-500 hover:bg-gray-600" },
             ].map((b) => (
               <form action={quickStatus} key={b.s}>
                 <input type="hidden" name="status" value={b.s} />

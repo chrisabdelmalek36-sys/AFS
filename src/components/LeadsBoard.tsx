@@ -3,6 +3,13 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  STATUSES,
+  PRIORITIES,
+  STATUS_CHIP,
+  PRIORITY_CHIP,
+  PRIORITY_ICON,
+} from "@/lib/statuses";
 
 // A Notion-style, fully inline-editable database of leads — mirrors the AFS
 // Notion "Lead Generation Database": Name, Company, Job Title, Email,
@@ -24,30 +31,6 @@ export interface BoardLead {
   notes: string | null;
   suppressed: boolean;
 }
-
-const STATUSES = [
-  "New", "Contacted", "Replied", "Meeting",
-  "Quote Sent", "Postponed", "Closed Won", "Closed Lost",
-];
-const PRIORITIES = ["Hot", "High", "Standard"];
-const EMAIL_STATUSES = ["Valid", "Catch-all"];
-
-const STATUS_STYLE: Record<string, string> = {
-  New: "bg-sky-100 text-sky-700",
-  Contacted: "bg-indigo-100 text-indigo-700",
-  Replied: "bg-purple-100 text-purple-700",
-  Meeting: "bg-amber-100 text-amber-700",
-  "Quote Sent": "bg-orange-100 text-orange-700",
-  Postponed: "bg-slate-100 text-slate-600",
-  "Closed Won": "bg-emerald-100 text-emerald-700",
-  "Closed Lost": "bg-rose-100 text-rose-700",
-};
-const PRIORITY_STYLE: Record<string, string> = {
-  Hot: "bg-rose-100 text-rose-700",
-  High: "bg-orange-100 text-orange-700",
-  Standard: "bg-blue-100 text-blue-700",
-};
-const PRIORITY_ICON: Record<string, string> = { Hot: "🔥", High: "⭐", Standard: "📋" };
 
 async function patch(id: number, body: Record<string, unknown>) {
   await fetch(`/api/lead/${id}/contact`, {
@@ -204,10 +187,10 @@ export default function LeadsBoard({ leads }: { leads: BoardLead[] }) {
             {rows.map((l) => (
               <tr key={l.id} className={`border-t border-slate-100 align-top ${l.suppressed ? "opacity-50" : ""}`}>
                 <td className="px-3 py-2">
-                  <Chip value={l.status} options={STATUSES} styleMap={STATUS_STYLE} onSave={(v) => save(l.id, { status: v })} />
+                  <Chip value={l.status} options={[...STATUSES]} styleMap={STATUS_CHIP} onSave={(v) => save(l.id, { status: v })} />
                 </td>
                 <td className="px-3 py-2">
-                  <Chip value={l.priority} options={PRIORITIES} styleMap={PRIORITY_STYLE} iconMap={PRIORITY_ICON} onSave={(v) => save(l.id, { priority: v })} />
+                  <Chip value={l.priority} options={[...PRIORITIES]} styleMap={PRIORITY_CHIP} iconMap={PRIORITY_ICON} onSave={(v) => save(l.id, { priority: v })} />
                 </td>
                 <td className="min-w-[140px] px-3 py-2">
                   <TextCell value={l.contact_person ?? ""} placeholder="+ name" onSave={(v) => save(l.id, { contact_person: v })} className="font-medium" />
