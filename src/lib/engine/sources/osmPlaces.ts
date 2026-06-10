@@ -54,6 +54,29 @@ export function buildQuery(
   return `[out:json][timeout:${timeoutS}];(${lines});out center tags 200;`;
 }
 
+// One query whose results span several area circles at once (union of
+// around-filters). Used by the targeted "Find leads" search so picking many
+// areas is still a single Overpass request per category.
+export function buildMultiQuery(
+  centers: { lat: number; lng: number; radiusM: number }[],
+  sels: string[],
+  timeoutS = 25,
+): string {
+  const lines = centers
+    .flatMap((c) => {
+      const around = `(around:${c.radiusM},${c.lat},${c.lng})`;
+      return sels.flatMap((s) => [`node[${s}]${around};`, `way[${s}]${around};`]);
+    })
+    .join("");
+  return `[out:json][timeout:${timeoutS}];(${lines});out center tags 400;`;
+}
+
+// Escapes a free-text keyword for use inside an Overpass name-regex selector.
+export function nameSelector(keyword: string): string {
+  const esc = keyword.replace(/["\\]/g, "").trim();
+  return `"name"~"${esc}",i`;
+}
+
 function tagOr(t: OsmTags | undefined, ...keys: string[]): string | undefined {
   if (!t) return undefined;
   for (const k of keys) if (t[k]) return t[k];

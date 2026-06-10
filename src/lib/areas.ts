@@ -108,3 +108,26 @@ export function areaZoom(radiusKm: number): number {
   if (radiusKm <= 30) return 10;
   return 9;
 }
+
+// A focus (center + zoom) that frames several areas at once.
+export function multiAreaFocus(
+  keys: string[],
+): { lat: number; lng: number; zoom: number } | null {
+  const picked = keys.map(areaByKey).filter((a): a is Area => !!a);
+  if (picked.length === 0) return null;
+  if (picked.length === 1) {
+    return { lat: picked[0]!.lat, lng: picked[0]!.lng, zoom: areaZoom(picked[0]!.radiusKm) };
+  }
+  const lats = picked.map((a) => a.lat);
+  const lngs = picked.map((a) => a.lng);
+  const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+  // Rough span (km) across the selection → zoom.
+  const span = haversineKm(
+    Math.min(...lats), Math.min(...lngs),
+    Math.max(...lats), Math.max(...lngs),
+  );
+  const zoom =
+    span > 400 ? 6 : span > 200 ? 7 : span > 100 ? 8 : span > 50 ? 9 : span > 25 ? 10 : 11;
+  return { lat, lng, zoom };
+}

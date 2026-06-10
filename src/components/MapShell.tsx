@@ -4,7 +4,14 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { MapLead, MapFocus } from "@/components/LeafletMap";
-import { AREAS, AREA_GROUPS, areaByKey, areaZoom, nearestArea } from "@/lib/areas";
+import {
+  AREAS,
+  AREA_GROUPS,
+  areaByKey,
+  areaZoom,
+  nearestArea,
+  multiAreaFocus,
+} from "@/lib/areas";
 
 const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
   ssr: false,
@@ -27,14 +34,24 @@ interface PlannedStop {
 export default function MapShell({
   leads,
   initialAreaKey = "",
+  initialAreaKeys = "",
 }: {
   leads: MapLead[];
   initialAreaKey?: string;
+  initialAreaKeys?: string;
 }) {
-  // Seeded from /map?area=… (e.g. the Today page's "where to visit" links).
-  const [areaKey, setAreaKey] = useState(
-    areaByKey(initialAreaKey) ? initialAreaKey : "",
+  // A multi-area selection from a "Find leads" search (/map?areas=a,b,c).
+  const seedMulti = initialAreaKeys
+    .split(",")
+    .map((k) => k.trim())
+    .filter((k) => !!areaByKey(k));
+  const [multiKeys, setMultiKeys] = useState<string[]>(
+    seedMulti.length > 1 ? seedMulti : [],
   );
+  // Seeded from /map?area=… (single area) or a 1-area search.
+  const seedSingle =
+    areaByKey(initialAreaKey)?.key ?? (seedMulti.length === 1 ? seedMulti[0] : "");
+  const [areaKey, setAreaKey] = useState(seedSingle ?? "");
   const [maxStops, setMaxStops] = useState(8);
   const [plan, setPlan] = useState<{
     stops: PlannedStop[];
@@ -50,6 +67,8 @@ export default function MapShell({
   const [manualOrder, setManualOrder] = useState(false);
 
   const area = areaKey ? areaByKey(areaKey) : undefined;
+  const multiSet = useMemo(() => new Set(multiKeys), [multiKeys]);
+  const multiActive = multiKeys.length > 1;
 
   // Each lead is assigned to exactly one area (its nearest), so the same
   // business never shows up under two different areas.
@@ -62,11 +81,16 @@ export default function MapShell({
     return m;
   }, [leads]);
 
-  // Leads in the selected area; all leads when no area is chosen.
-  const shown = useMemo(
-    () => (area ? leads.filter((l) => areaOf.get(l.id) === area.key) : leads),
-    [leads, area, areaOf],
-  );
+  // Leads to show: a multi-area search set, a single area, or everything.
+  const shown = useMemo(() => {
+    if (multiActive) {
+      return leads.filter((l) => {
+        const k = areaOf.get(l.id);
+        return k != null && multiSet.has(k);
+      });
+    }
+    return area ? leads.filter((l) => areaOf.get(l.id) === area.key) : leads;
+  }, [leads, area, areaOf, multiActive, multiSet]);
 
   // Live lead count per area, so the picker doubles as a heat list.
   const counts = useMemo(() => {
@@ -86,14 +110,16 @@ export default function MapShell({
     [counts],
   );
 
-  const focus: MapFocus | null = area
-    ? {
-        lat: area.lat,
-        lng: area.lng,
-        zoom: areaZoom(area.radiusKm),
-        radiusKm: area.radiusKm,
-      }
-    : null;
+  const focus: MapFocus | null = multiActive
+    ? multiAreaFocus(multiKeys)
+    : area
+      ? {
+          lat: area.lat,
+          lng: area.lng,
+          zoom: areaZoom(area.radiusKm),
+          radiusKm: area.radiusKm,
+        }
+      : null;
 
   // Fresh plan. Removed stops are always excluded; when a route already
   // exists, its current stops are excluded too and picks are shuffled, so
@@ -173,12 +199,28 @@ export default function MapShell({
 
   function selectArea(key: string) {
     setAreaKey(key);
+    setMultiKeys([]); // leaving the multi-area search view
     setPlan(null);
     setErr(null);
   }
 
   return (
     <div className="space-y-3">
+      {multiActive && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm">
+          <span className="text-violet-800">
+            Showing <b>{shown.length}</b> lead{shown.length === 1 ? "" : "s"} across{" "}
+            <b>{multiKeys.length}</b> areas from your search.
+          </span>
+          <button
+            onClick={() => selectArea("")}
+            className="rounded-md border border-violet-300 bg-white px-3 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100"
+          >
+            Show all Egypt
+          </button>
+        </div>
+      )}
+
       {/* Quick area chips — busiest areas first */}
       <div className="flex flex-wrap items-center gap-1.5">
         <button

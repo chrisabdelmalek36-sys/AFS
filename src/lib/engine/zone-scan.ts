@@ -6,9 +6,12 @@ import {
   OVERPASS_URL,
   CATEGORY_QUERIES,
   buildQuery,
+  buildMultiQuery,
+  nameSelector,
   toLead,
   type OsmElement,
 } from "./sources/osmPlaces";
+import { nearestArea } from "../areas";
 import type { RawLead } from "./sources/types";
 
 // Resumable OSM discovery that fits inside Vercel's 60s function ceiling.
@@ -155,12 +158,23 @@ export async function scanStep(deadline: number): Promise<ScanStepResult> {
   return result;
 }
 
-// Targeted, on-demand scan: pull only the chosen categories within a single
-// area, in one serverless call. Used by the "Find leads" page.
+// Targeted, on-demand scan: pull the chosen categories (and any free-text
+// types) across one or more chosen areas, in a single serverless call. Each
+// category/keyword is one Overpass request whose results span every selected
+// area circle at once. Used by the "Find leads" page.
+export interface TargetedArea {
+  key: string;
+  label: string;
+  group: string | null;
+  lat: number;
+  lng: number;
+  radiusKm: number;
+}
+
 export interface TargetedResult {
-  area: string;
-  region: string | null;
+  areas: string[];
   categories: string[];
+  custom: string[];
   queries: number;
   rawCount: number;
   inserted: number;
@@ -169,16 +183,31 @@ export interface TargetedResult {
 }
 
 export async function targetedScan(opts: {
-  lat: number;
-  lng: number;
-  radiusKm: number;
-  region: string | null;
-  areaLabel: string;
+  areas: TargetedArea[];
   categories: string[];
+  custom: string[];
   deadline: number;
 }): Promise<TargetedResult> {
+  // Search a touch wider than the tight display radius so edge venues aren't
+  // missed; each lead is still tagged to its nearest area's region below.
+  const centers = opts.areas.map((a) => ({
+    lat: a.lat,
+    lng: a.lng,
+    radiusM: Math.round(Math.max(a.radiusKm, 4) * 1000),
+  }));
+  const fallbackGroup = opts.areas[0]?.group ?? null;
+
   const cats = CATEGORY_QUERIES.filter((c) => opts.categories.includes(c.key));
-  const radiusM = Math.round(opts.radiusKm * 1000);
+  const customKeywords = opts.custom
+    .map((k) => k.trim())
+    .filter((k) => k.length >= 2)
+    .slice(0, 6);
+
+  // One job per category + one per custom keyword.
+  const jobs: { key: string; selectors: string[] }[] = [
+    ...cats.map((c) => ({ key: c.key, selectors: c.selectors })),
+    ...customKeywords.map((k) => ({ key: k.toLowerCase(), selectors: [nameSelector(k)] })),
+  ];
 
   const runRow = await query<{ id: number }>(
     `INSERT INTO crawl_runs (mode) VALUES ('targeted') RETURNING id`,
@@ -187,10 +216,10 @@ export async function targetedScan(opts: {
 
   const raw: RawLead[] = [];
   let queries = 0;
-  for (const cq of cats) {
+  for (const job of jobs) {
     if (Date.now() > opts.deadline - 8_000) break;
     const body = `data=${encodeURIComponent(
-      buildQuery(opts.lat, opts.lng, radiusM, cq.selectors, 20),
+      buildMultiQuery(centers, job.selectors, 25),
     )}`;
     try {
       const r = await fetch(OVERPASS_URL, {
@@ -200,20 +229,26 @@ export async function targetedScan(opts: {
           "User-Agent": config.enrich.userAgent,
         },
         body,
-        signal: AbortSignal.timeout(22_000),
+        signal: AbortSignal.timeout(28_000),
       });
       if (r.ok) {
         const j = (await r.json()) as { elements?: OsmElement[] };
         for (const el of j.elements ?? []) {
-          const lead = toLead(el, cq.key, opts.region ?? opts.areaLabel);
+          const lat = el.lat ?? el.center?.lat;
+          const lng = el.lon ?? el.center?.lon;
+          const region =
+            (lat != null && lng != null ? nearestArea(lat, lng)?.group : null) ??
+            fallbackGroup ??
+            "Egypt";
+          const lead = toLead(el, job.key, region);
           if (lead) raw.push(lead);
         }
         queries++;
       } else {
-        log.warn(`Overpass ${r.status} for targeted/${cq.key}`);
+        log.warn(`Overpass ${r.status} for targeted/${job.key}`);
       }
     } catch (e) {
-      log.warn(`Overpass failed (targeted/${cq.key}):`, e);
+      log.warn(`Overpass failed (targeted/${job.key}):`, e);
     }
     await new Promise((res) => setTimeout(res, 250));
   }
@@ -226,15 +261,16 @@ export async function targetedScan(opts: {
       [runId, queries],
     );
   }
+  const areaLabels = opts.areas.map((a) => a.label);
   await query(
     `UPDATE crawl_runs SET finished_at=now(), status='ok', stats=$2 WHERE id=$1`,
-    [runId, JSON.stringify({ area: opts.areaLabel, queries, ...stats })],
+    [runId, JSON.stringify({ areas: areaLabels, queries, ...stats })],
   );
 
   return {
-    area: opts.areaLabel,
-    region: opts.region,
+    areas: areaLabels,
     categories: opts.categories,
+    custom: customKeywords,
     queries,
     ...stats,
   };
