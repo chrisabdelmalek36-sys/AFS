@@ -4,6 +4,7 @@ import { dedupHash, normalizeName, normalizePhone } from "./util/dedup";
 import { classify } from "./util/tiering";
 import { freshnessScore } from "./util/freshness";
 import { findWebsiteEmail } from "./enrich/website";
+import { isRelevantBusiness } from "./util/relevance";
 import type { RawLead } from "./sources/types";
 
 // Shared merge + tier + store stage, used by the full pipeline (scripts/CLI)
@@ -86,8 +87,10 @@ export async function ingestRawLeads(
   raw: RawLead[],
   opts: { enrich: boolean },
 ): Promise<IngestStats> {
-  const merged = mergeBatch(raw);
-  log.info(`After dedupe: ${merged.length} unique leads`);
+  const merged = mergeBatch(raw).filter((m) =>
+    isRelevantBusiness(m.name, m.category),
+  );
+  log.info(`After dedupe + relevance: ${merged.length} unique leads`);
 
   let inserted = 0,
     updated = 0,

@@ -35,6 +35,10 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Stops the user kicked off a route — never offered again this session.
+  const [removedIds, setRemovedIds] = useState<number[]>([]);
+  // Once the user reorders manually, edits stop re-optimising the order.
+  const [manualOrder, setManualOrder] = useState(false);
 
   const area = areaKey ? areaByKey(areaKey) : undefined;
 
@@ -82,10 +86,16 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
       }
     : null;
 
+  // Fresh plan. Removed stops are always excluded; when a route already
+  // exists, its current stops are excluded too and picks are shuffled, so
+  // re-planning gives DIFFERENT places instead of the same route again.
   async function planRoute() {
+    const excludeNow = plan
+      ? [...removedIds, ...plan.stops.map((s) => Number(s.id))]
+      : removedIds;
     setBusy(true);
     setErr(null);
-    setPlan(null);
+    setManualOrder(false);
     try {
       const res = await fetch("/api/route/plan", {
         method: "POST",
@@ -95,6 +105,8 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
             ? { lat: area.lat, lng: area.lng, radiusKm: area.radiusKm }
             : undefined,
           maxStops,
+          exclude: excludeNow,
+          shuffle: plan != null,
         }),
       });
       const data = await res.json();
@@ -107,16 +119,17 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
     }
   }
 
-  // Re-plan from an explicit set of lead ids — used when editing the route
-  // (removing, replacing, or adding a stop). The optimiser re-orders them.
-  async function replan(ids: number[]) {
+  // Re-plan from an explicit set of lead ids — used when editing the route.
+  // keepOrder preserves the given order (manual reordering); otherwise the
+  // optimiser re-orders.
+  async function replan(ids: number[], keepOrder: boolean) {
     setBusy(true);
     setErr(null);
     try {
       const res = await fetch("/api/route/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({ ids, keepOrder }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to update route");
@@ -128,16 +141,26 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
     }
   }
 
-  const stopIds = plan?.stops.map((s) => s.id) ?? [];
+  const stopIds = plan?.stops.map((s) => Number(s.id)) ?? [];
 
   function removeStop(id: number) {
-    replan(stopIds.filter((x) => x !== id));
+    setRemovedIds((r) => [...r, id]); // never suggest it again this session
+    replan(stopIds.filter((x) => x !== id), manualOrder);
   }
   function addStop(id: number) {
-    if (id && !stopIds.includes(id)) replan([...stopIds, id]);
+    if (id && !stopIds.includes(id)) replan([...stopIds, id], manualOrder);
+  }
+  // Move a stop to a new 1-based position (e.g. make it first or last).
+  function moveStop(id: number, newPos: number) {
+    const rest = stopIds.filter((x) => x !== id);
+    rest.splice(newPos - 1, 0, id);
+    setManualOrder(true);
+    replan(rest, true);
   }
   // Other leads in view that aren't already on the route — candidates to add.
-  const candidates = shown.filter((l) => !stopIds.includes(l.id));
+  const candidates = shown.filter(
+    (l) => !stopIds.includes(l.id) && !removedIds.includes(l.id),
+  );
 
   function selectArea(key: string) {
     setAreaKey(key);
@@ -232,7 +255,9 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
             >
               {busy
                 ? "Planning…"
-                : `Plan route${area ? ` in ${area.label}` : ""}`}
+                : plan
+                  ? `New route (other places)${area ? ` in ${area.label}` : ""}`
+                  : `Plan route${area ? ` in ${area.label}` : ""}`}
             </button>
             {area != null && shown.length < 2 && (
               <p className="mt-2 text-xs text-slate-500">
@@ -266,9 +291,19 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
                     key={s.id}
                     className="flex items-start gap-2 border-b border-slate-100 py-1.5 last:border-0"
                   >
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
-                      {i + 1}
-                    </span>
+                    <select
+                      value={i + 1}
+                      disabled={busy}
+                      title="Change this stop's position (1 = first)"
+                      onChange={(e) => moveStop(Number(s.id), Number(e.target.value))}
+                      className="mt-0.5 shrink-0 cursor-pointer rounded-full border border-violet-200 bg-violet-50 px-1 py-0.5 text-xs font-bold text-violet-700"
+                    >
+                      {plan.stops.map((_, n) => (
+                        <option key={n} value={n + 1}>
+                          {n + 1}
+                        </option>
+                      ))}
+                    </select>
                     <div className="min-w-0 grow">
                       <Link
                         href={`/lead/${s.id}`}
@@ -315,8 +350,9 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-slate-400">
-                  Remove a stop with ✕, then add another here — the route
-                  re-optimises automatically.
+                  ✕ removes a stop (it won&apos;t be suggested again). Change a
+                  stop&apos;s number to make it first/last. &quot;New route&quot;
+                  picks different places entirely.
                 </p>
               </div>
             </div>
