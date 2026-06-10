@@ -154,3 +154,88 @@ export async function scanStep(deadline: number): Promise<ScanStepResult> {
   log.info(`zone scan step: ${JSON.stringify(result)}`);
   return result;
 }
+
+// Targeted, on-demand scan: pull only the chosen categories within a single
+// area, in one serverless call. Used by the "Find leads" page.
+export interface TargetedResult {
+  area: string;
+  region: string | null;
+  categories: string[];
+  queries: number;
+  rawCount: number;
+  inserted: number;
+  updated: number;
+  suppressed: number;
+}
+
+export async function targetedScan(opts: {
+  lat: number;
+  lng: number;
+  radiusKm: number;
+  region: string | null;
+  areaLabel: string;
+  categories: string[];
+  deadline: number;
+}): Promise<TargetedResult> {
+  const cats = CATEGORY_QUERIES.filter((c) => opts.categories.includes(c.key));
+  const radiusM = Math.round(opts.radiusKm * 1000);
+
+  const runRow = await query<{ id: number }>(
+    `INSERT INTO crawl_runs (mode) VALUES ('targeted') RETURNING id`,
+  );
+  const runId = runRow.rows[0]!.id;
+
+  const raw: RawLead[] = [];
+  let queries = 0;
+  for (const cq of cats) {
+    if (Date.now() > opts.deadline - 8_000) break;
+    const body = `data=${encodeURIComponent(
+      buildQuery(opts.lat, opts.lng, radiusM, cq.selectors, 20),
+    )}`;
+    try {
+      const r = await fetch(OVERPASS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": config.enrich.userAgent,
+        },
+        body,
+        signal: AbortSignal.timeout(22_000),
+      });
+      if (r.ok) {
+        const j = (await r.json()) as { elements?: OsmElement[] };
+        for (const el of j.elements ?? []) {
+          const lead = toLead(el, cq.key, opts.region ?? opts.areaLabel);
+          if (lead) raw.push(lead);
+        }
+        queries++;
+      } else {
+        log.warn(`Overpass ${r.status} for targeted/${cq.key}`);
+      }
+    } catch (e) {
+      log.warn(`Overpass failed (targeted/${cq.key}):`, e);
+    }
+    await new Promise((res) => setTimeout(res, 250));
+  }
+
+  const stats = await ingestRawLeads(raw, { enrich: false });
+  if (queries > 0) {
+    await query(
+      `INSERT INTO api_usage (run_id, provider, calls, est_cost_usd)
+       VALUES ($1, 'osm', $2, 0)`,
+      [runId, queries],
+    );
+  }
+  await query(
+    `UPDATE crawl_runs SET finished_at=now(), status='ok', stats=$2 WHERE id=$1`,
+    [runId, JSON.stringify({ area: opts.areaLabel, queries, ...stats })],
+  );
+
+  return {
+    area: opts.areaLabel,
+    region: opts.region,
+    categories: opts.categories,
+    queries,
+    ...stats,
+  };
+}
