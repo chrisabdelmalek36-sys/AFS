@@ -76,8 +76,15 @@ export default function TargetedSearch({
       if (found > 0) {
         // Drop the results straight onto the map, framed to the chosen areas.
         router.push(`/map?areas=${encodeURIComponent(areaKeys.join(","))}`);
+      } else if (data.busy) {
+        setErr(
+          "OpenStreetMap is busy right now and didn't respond. Please wait a few seconds and try again — your selection is kept.",
+        );
+        setBusy(false);
       } else {
-        setNote("No matches this time — try more types, a custom type, or another area.");
+        setNote(
+          "No new matches in that area for those types. Tip: try broader types (e.g. Restaurant, Cafe), add a custom type, or pick a nearby/larger area. Leads already found before won't be re-added.",
+        );
         setBusy(false);
       }
     } catch (e) {
