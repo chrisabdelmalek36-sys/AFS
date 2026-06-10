@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { MapLead, MapFocus } from "@/components/LeafletMap";
-import { AREAS, AREA_GROUPS, areaByKey, areaZoom, inArea } from "@/lib/areas";
+import { AREAS, AREA_GROUPS, areaByKey, areaZoom, nearestArea } from "@/lib/areas";
 
 const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
   ssr: false,
@@ -38,20 +38,29 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
 
   const area = areaKey ? areaByKey(areaKey) : undefined;
 
-  // Leads inside the selected area; all leads when no area is chosen.
+  // Each lead is assigned to exactly one area (its nearest), so the same
+  // business never shows up under two different areas.
+  const areaOf = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const l of leads) {
+      const a = nearestArea(l.lat, l.lng);
+      if (a) m.set(l.id, a.key);
+    }
+    return m;
+  }, [leads]);
+
+  // Leads in the selected area; all leads when no area is chosen.
   const shown = useMemo(
-    () => (area ? leads.filter((l) => inArea(area, l.lat, l.lng)) : leads),
-    [leads, area],
+    () => (area ? leads.filter((l) => areaOf.get(l.id) === area.key) : leads),
+    [leads, area, areaOf],
   );
 
   // Live lead count per area, so the picker doubles as a heat list.
   const counts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const a of AREAS) {
-      m.set(a.key, leads.filter((l) => inArea(a, l.lat, l.lng)).length);
-    }
+    for (const key of areaOf.values()) m.set(key, (m.get(key) ?? 0) + 1);
     return m;
-  }, [leads]);
+  }, [areaOf]);
 
   // The busiest areas surface as one-click chips above the map.
   const topAreas = useMemo(
@@ -97,6 +106,38 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
       setBusy(false);
     }
   }
+
+  // Re-plan from an explicit set of lead ids — used when editing the route
+  // (removing, replacing, or adding a stop). The optimiser re-orders them.
+  async function replan(ids: number[]) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch("/api/route/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to update route");
+      setPlan(data);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const stopIds = plan?.stops.map((s) => s.id) ?? [];
+
+  function removeStop(id: number) {
+    replan(stopIds.filter((x) => x !== id));
+  }
+  function addStop(id: number) {
+    if (id && !stopIds.includes(id)) replan([...stopIds, id]);
+  }
+  // Other leads in view that aren't already on the route — candidates to add.
+  const candidates = shown.filter((l) => !stopIds.includes(l.id));
 
   function selectArea(key: string) {
     setAreaKey(key);
@@ -228,7 +269,7 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
                     <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
                       {i + 1}
                     </span>
-                    <div>
+                    <div className="min-w-0 grow">
                       <Link
                         href={`/lead/${s.id}`}
                         className="font-medium text-violet-700 hover:underline"
@@ -239,9 +280,45 @@ export default function MapShell({ leads }: { leads: MapLead[] }) {
                         {s.address ?? "—"}
                       </p>
                     </div>
+                    <button
+                      onClick={() => removeStop(s.id)}
+                      disabled={busy || plan.stops.length <= 2}
+                      title={plan.stops.length <= 2 ? "A route needs at least 2 stops" : "Remove this stop"}
+                      className="mt-0.5 shrink-0 rounded px-1.5 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                    >
+                      ✕
+                    </button>
                   </li>
                 ))}
               </ol>
+
+              {/* Add / replace a stop with another lead in view */}
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <label className="mb-1 block text-xs text-slate-500">
+                  Add a stop {area ? `from ${area.label}` : ""}
+                </label>
+                <select
+                  value=""
+                  disabled={busy || candidates.length === 0}
+                  onChange={(e) => {
+                    if (e.target.value) addStop(Number(e.target.value));
+                  }}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-50"
+                >
+                  <option value="">
+                    {candidates.length === 0 ? "No other leads in view" : "+ Add a lead to the route…"}
+                  </option>
+                  {candidates.slice(0, 200).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  Remove a stop with ✕, then add another here — the route
+                  re-optimises automatically.
+                </p>
+              </div>
             </div>
           )}
 
