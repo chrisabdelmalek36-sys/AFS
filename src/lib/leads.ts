@@ -400,6 +400,67 @@ export async function markWhatsappSent(messageId: number): Promise<boolean> {
   return true;
 }
 
+export interface EmailDueToday {
+  message_id: number;
+  lead_id: number;
+  name: string;
+  subject: string | null;
+  step_label: string | null;
+  scheduled_for: string;
+}
+
+export interface TodayData {
+  newToday: Lead[];
+  followupsDue: Lead[];
+  emailsToday: EmailDueToday[];
+  weeklyDiscovery: { week: string; n: number }[];
+}
+
+// Everything the morning "Today" screen needs in one round trip set.
+export async function todayData(): Promise<TodayData> {
+  const newToday = await q<Lead>(
+    `SELECT * FROM leads
+      WHERE NOT suppressed
+        AND discovered_date = (now() AT TIME ZONE 'Africa/Cairo')::date
+      ORDER BY CASE tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
+                         WHEN 'Silver' THEN 2 ELSE 3 END, freshness DESC
+      LIMIT 10`,
+  );
+  const followupsDue = await q<Lead>(
+    `SELECT * FROM leads
+      WHERE NOT suppressed
+        AND status = ANY($1)
+        AND (
+          (follow_up_at IS NOT NULL AND follow_up_at <= now())
+          OR (follow_up_at IS NULL AND (last_contacted_at IS NULL
+              OR last_contacted_at < now() - interval '7 days'))
+        )
+      ORDER BY follow_up_at NULLS FIRST, last_contacted_at NULLS FIRST
+      LIMIT 15`,
+    [IN_PROGRESS_STATUSES],
+  );
+  const emailsToday = await q<EmailDueToday>(
+    `SELECT m.id AS message_id, m.lead_id, l.name, m.subject, m.step_label,
+            m.scheduled_for
+       FROM outreach_messages m
+       JOIN leads l ON l.id = m.lead_id
+      WHERE m.channel='email' AND m.status='scheduled'
+        AND m.scheduled_for <= (now() AT TIME ZONE 'Africa/Cairo')::date + interval '1 day'
+        AND NOT l.suppressed
+      ORDER BY m.scheduled_for
+      LIMIT 25`,
+  );
+  const weeklyDiscovery = await q<{ week: string; n: string }>(
+    `SELECT to_char(date_trunc('week', discovered_date), 'DD Mon') week,
+            COUNT(*) n
+       FROM leads
+      WHERE discovered_date >= (now() AT TIME ZONE 'Africa/Cairo')::date - 55
+      GROUP BY date_trunc('week', discovered_date)
+      ORDER BY date_trunc('week', discovered_date)`,
+  ).then((rows) => rows.map((r) => ({ week: r.week, n: Number(r.n) })));
+  return { newToday, followupsDue, emailsToday, weeklyDiscovery };
+}
+
 export async function contactHistory(leadId: number) {
   return q<{
     id: number; channel: string; direction: string;

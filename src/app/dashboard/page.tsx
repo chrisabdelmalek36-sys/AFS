@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { dashboardSummary, whatsappFollowupsDue } from "@/lib/leads";
+import { dashboardSummary, whatsappFollowupsDue, todayData } from "@/lib/leads";
 import { Card, Kpi, Bar, TierBadge, StatusBadge, egp } from "@/components/ui";
 import ScanButton from "@/components/ScanButton";
 import WhatsAppSendButton from "@/components/WhatsAppSendButton";
@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const s = await dashboardSummary();
   const waDue = await whatsappFollowupsDue();
+  const { weeklyDiscovery } = await todayData();
+  const maxWeek = Math.max(...weeklyDiscovery.map((w) => w.n), 1);
 
   const statusN = (k: string) => s.byStatus.find((x) => x.status === k)?.n ?? 0;
   const active = s.totalLeads - s.suppressed;
@@ -57,6 +59,20 @@ export default async function DashboardPage() {
           </div>
         </Card>
 
+        <Card title="Leads found per week" subtitle="Last 8 weeks of discovery">
+          {weeklyDiscovery.length === 0 ? (
+            <p className="text-sm text-slate-400">No discovery history yet.</p>
+          ) : (
+            <div className="space-y-1">
+              {weeklyDiscovery.map((w) => (
+                <Bar key={w.week} label={`Week of ${w.week}`} value={w.n} max={maxWeek} color="#0ea5e9" />
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Pipeline by status">
           {s.byStatus.length === 0 ? (
             <p className="text-sm text-slate-400">No leads yet.</p>

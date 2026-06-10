@@ -24,8 +24,17 @@ interface PlannedStop {
   address: string | null;
 }
 
-export default function MapShell({ leads }: { leads: MapLead[] }) {
-  const [areaKey, setAreaKey] = useState("");
+export default function MapShell({
+  leads,
+  initialAreaKey = "",
+}: {
+  leads: MapLead[];
+  initialAreaKey?: string;
+}) {
+  // Seeded from /map?area=… (e.g. the Today page's "where to visit" links).
+  const [areaKey, setAreaKey] = useState(
+    areaByKey(initialAreaKey) ? initialAreaKey : "",
+  );
   const [maxStops, setMaxStops] = useState(8);
   const [plan, setPlan] = useState<{
     stops: PlannedStop[];
