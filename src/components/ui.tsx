@@ -70,6 +70,7 @@ export function Nav() {
   const items = [
     ["/dashboard", "Dashboard"],
     ["/leads", "Leads"],
+    ["/database", "Database"],
     ["/map", "Map"],
     ["/outreach", "Outreach"],
     ["/digest", "Digest"],

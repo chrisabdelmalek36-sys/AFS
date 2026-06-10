@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { dashboardSummary } from "@/lib/leads";
+import { dashboardSummary, whatsappFollowupsDue } from "@/lib/leads";
 import { Card, TierBadge, StatusBadge, egp } from "@/components/ui";
 import ScanButton from "@/components/ScanButton";
+import WhatsAppSendButton from "@/components/WhatsAppSendButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const s = await dashboardSummary();
+  const waDue = await whatsappFollowupsDue();
 
   return (
     <div className="space-y-6">
@@ -93,6 +95,48 @@ export default async function DashboardPage() {
                     ? `last ${new Date(l.last_contacted_at).toLocaleDateString()}`
                     : "never contacted"}
                 </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card title={`WhatsApp follow-ups due (${waDue.length})`}>
+        {waDue.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Nothing due. Generate outreach on a lead to start a WhatsApp
+            sequence — due steps show up here each day.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {waDue.map((w) => (
+              <li
+                key={w.message_id}
+                className="flex flex-wrap items-center justify-between gap-2 py-2"
+              >
+                <div className="min-w-0">
+                  <Link
+                    href={`/lead/${w.lead_id}`}
+                    className="font-medium text-violet-700 hover:underline"
+                  >
+                    {w.name}
+                  </Link>
+                  <span className="ml-2 text-xs text-slate-500">
+                    {w.contact_person ? `${w.contact_person} · ` : ""}
+                    {w.step_label}
+                  </span>
+                  <p className="mt-0.5 line-clamp-1 max-w-xl text-xs text-slate-500">
+                    {w.body}
+                  </p>
+                </div>
+                <WhatsAppSendButton
+                  messageId={w.message_id}
+                  phone={w.phone}
+                  phoneNorm={w.phone_norm}
+                  text={w.body}
+                  sent={false}
+                  label="Send on WhatsApp"
+                />
               </li>
             ))}
           </ul>

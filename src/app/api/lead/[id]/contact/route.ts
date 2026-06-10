@@ -25,6 +25,11 @@ export async function PATCH(
   if ("contact_title" in body) patch.contact_title = body.contact_title;
   if ("linkedin_url" in body) patch.linkedin_url = body.linkedin_url;
   if ("contact_verified" in body) patch.contact_verified = body.contact_verified;
+  if ("priority" in body) patch.priority = body.priority;
+  if ("notes" in body) patch.notes = body.notes;
+  if ("email" in body) patch.email = body.email;
+  if ("email_status" in body) patch.email_status = body.email_status;
+  if ("status" in body) patch.status = body.status;
 
   try {
     await updateLeadContact(id, patch);
