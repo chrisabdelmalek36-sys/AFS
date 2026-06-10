@@ -86,7 +86,7 @@ export interface IngestStats {
 export async function ingestRawLeads(
   raw: RawLead[],
   opts: { enrich: boolean },
-): Promise<IngestStats> {
+): Promise<{ stats: IngestStats; ids: number[] }> {
   let merged = mergeBatch(raw).filter((m) =>
     isRelevantBusiness(m.name, m.category),
   );
@@ -103,6 +103,7 @@ export async function ingestRawLeads(
   }
   log.info(`After dedupe + relevance: ${merged.length} unique leads`);
 
+  const ids: number[] = [];
   let inserted = 0,
     updated = 0,
     suppressed = 0;
@@ -193,6 +194,7 @@ export async function ingestRawLeads(
       );
       updated++;
     }
+    ids.push(leadId);
     if (dnc != null) suppressed++;
 
     for (const p of m.provenance) {
@@ -205,10 +207,13 @@ export async function ingestRawLeads(
   }
 
   return {
-    rawCount: raw.length,
-    mergedCount: merged.length,
-    inserted,
-    updated,
-    suppressed,
+    stats: {
+      rawCount: raw.length,
+      mergedCount: merged.length,
+      inserted,
+      updated,
+      suppressed,
+    },
+    ids,
   };
 }

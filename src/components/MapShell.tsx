@@ -11,6 +11,7 @@ import {
   areaZoom,
   nearestArea,
   multiAreaFocus,
+  haversineKm,
 } from "@/lib/areas";
 
 const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
@@ -35,11 +36,22 @@ export default function MapShell({
   leads,
   initialAreaKey = "",
   initialAreaKeys = "",
+  initialIds = "",
 }: {
   leads: MapLead[];
   initialAreaKey?: string;
   initialAreaKeys?: string;
+  initialIds?: string;
 }) {
+  // A specific search result (/map?ids=…): show ONLY these leads.
+  const [idFilter, setIdFilter] = useState<number[]>(
+    initialIds
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0),
+  );
+  const idSet = useMemo(() => new Set(idFilter), [idFilter]);
+  const idsActive = idFilter.length > 0;
   // A multi-area selection from a "Find leads" search (/map?areas=a,b,c).
   const seedMulti = initialAreaKeys
     .split(",")
@@ -81,8 +93,10 @@ export default function MapShell({
     return m;
   }, [leads]);
 
-  // Leads to show: a multi-area search set, a single area, or everything.
+  // Leads to show: a specific id result, a multi-area set, a single area,
+  // or everything.
   const shown = useMemo(() => {
+    if (idsActive) return leads.filter((l) => idSet.has(l.id));
     if (multiActive) {
       return leads.filter((l) => {
         const k = areaOf.get(l.id);
@@ -90,7 +104,7 @@ export default function MapShell({
       });
     }
     return area ? leads.filter((l) => areaOf.get(l.id) === area.key) : leads;
-  }, [leads, area, areaOf, multiActive, multiSet]);
+  }, [leads, area, areaOf, multiActive, multiSet, idsActive, idSet]);
 
   // Live lead count per area, so the picker doubles as a heat list.
   const counts = useMemo(() => {
@@ -110,16 +124,32 @@ export default function MapShell({
     [counts],
   );
 
-  const focus: MapFocus | null = multiActive
-    ? multiAreaFocus(multiKeys)
-    : area
-      ? {
-          lat: area.lat,
-          lng: area.lng,
-          zoom: areaZoom(area.radiusKm),
-          radiusKm: area.radiusKm,
-        }
-      : null;
+  // Frame a set of leads (centroid + zoom from their spread).
+  const fitFocus = (pts: { lat: number; lng: number }[]): MapFocus | null => {
+    if (pts.length === 0) return null;
+    const lats = pts.map((p) => p.lat);
+    const lngs = pts.map((p) => p.lng);
+    const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+    if (pts.length === 1) return { lat, lng, zoom: 14 };
+    const span = haversineKm(Math.min(...lats), Math.min(...lngs), Math.max(...lats), Math.max(...lngs));
+    const zoom =
+      span > 400 ? 6 : span > 200 ? 7 : span > 100 ? 8 : span > 50 ? 9 : span > 20 ? 10 : span > 8 ? 11 : 13;
+    return { lat, lng, zoom };
+  };
+
+  const focus: MapFocus | null = idsActive
+    ? fitFocus(shown)
+    : multiActive
+      ? multiAreaFocus(multiKeys)
+      : area
+        ? {
+            lat: area.lat,
+            lng: area.lng,
+            zoom: areaZoom(area.radiusKm),
+            radiusKm: area.radiusKm,
+          }
+        : null;
 
   // Fresh plan. Removed stops are always excluded; when a route already
   // exists, its current stops are excluded too and picks are shuffled, so
@@ -200,12 +230,27 @@ export default function MapShell({
   function selectArea(key: string) {
     setAreaKey(key);
     setMultiKeys([]); // leaving the multi-area search view
+    setIdFilter([]); // leaving the search-result view
     setPlan(null);
     setErr(null);
   }
 
   return (
     <div className="space-y-3">
+      {idsActive && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm">
+          <span className="text-emerald-800">
+            Showing <b>{shown.length}</b> lead{shown.length === 1 ? "" : "s"} from
+            your search.
+          </span>
+          <button
+            onClick={() => selectArea("")}
+            className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+          >
+            Show all Egypt
+          </button>
+        </div>
+      )}
       {multiActive && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm">
           <span className="text-violet-800">

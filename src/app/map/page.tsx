@@ -8,9 +8,12 @@ export const dynamic = "force-dynamic";
 export default async function MapPage({
   searchParams,
 }: {
-  searchParams: { all?: string; area?: string; areas?: string };
+  searchParams: { all?: string; area?: string; areas?: string; ids?: string };
 }) {
-  const showAll = searchParams.all === "1";
+  // When showing a specific search result (?ids=), include leads of any
+  // status so every match is on the map, not just the brand-new ones.
+  const idsMode = !!searchParams.ids;
+  const showAll = searchParams.all === "1" || idsMode;
   const all = await listLeads();
 
   const onMap = all.filter(
@@ -70,6 +73,7 @@ export default async function MapPage({
         leads={leads}
         initialAreaKey={searchParams.area ?? ""}
         initialAreaKeys={searchParams.areas ?? ""}
+        initialIds={searchParams.ids ?? ""}
       />
     </div>
   );
