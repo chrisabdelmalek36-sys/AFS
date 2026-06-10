@@ -167,6 +167,7 @@ export async function distinctValues(): Promise<{
 export interface DashboardSummary {
   totalLeads: number;
   newToday: number;
+  newThisWeek: number;
   suppressed: number;
   byTier: { tier: string; n: number; pipelineMin: number; pipelineMax: number }[];
   byStatus: { status: string; n: number }[];
@@ -177,6 +178,13 @@ export interface DashboardSummary {
   }[];
   pipelineMin: number;
   pipelineMax: number;
+  valueWonMax: number;
+  valueInProgressMax: number;
+  wonCount: number;
+  lostCount: number;
+  workedCount: number;       // leads moved beyond "New"
+  topRegions: { region: string; n: number }[];
+  topCategories: { category: string; n: number }[];
 }
 
 export async function dashboardSummary(): Promise<DashboardSummary> {
@@ -185,8 +193,22 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
     `SELECT COUNT(*) n FROM leads
       WHERE discovered_date = (now() AT TIME ZONE 'Africa/Cairo')::date`,
   );
+  const [week] = await q<{ n: string }>(
+    `SELECT COUNT(*) n FROM leads
+      WHERE discovered_date >= (now() AT TIME ZONE 'Africa/Cairo')::date - 6`,
+  );
   const [sup] = await q<{ n: string }>(
     `SELECT COUNT(*) n FROM leads WHERE suppressed`,
+  );
+  const [val] = await q<{ won: string; prog: string; wonc: string; lostc: string; worked: string }>(
+    `SELECT
+       COALESCE(SUM(est_deal_max_egp) FILTER (WHERE status='Closed Won'),0) won,
+       COALESCE(SUM(est_deal_max_egp) FILTER (WHERE status = ANY($1)),0) prog,
+       COUNT(*) FILTER (WHERE status='Closed Won') wonc,
+       COUNT(*) FILTER (WHERE status='Closed Lost') lostc,
+       COUNT(*) FILTER (WHERE status <> 'New') worked
+     FROM leads WHERE NOT suppressed`,
+    [IN_PROGRESS_STATUSES],
   );
   const byTier = await q<{
     tier: string; n: string; mn: string; mx: string;
@@ -203,6 +225,16 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
   const byStatus = await q<{ status: string; n: string }>(
     `SELECT status, COUNT(*) n FROM leads WHERE NOT suppressed
       GROUP BY 1 ORDER BY 1`,
+  );
+  const topRegions = await q<{ region: string; n: string }>(
+    `SELECT region, COUNT(*) n FROM leads
+      WHERE NOT suppressed AND region IS NOT NULL
+      GROUP BY 1 ORDER BY 2 DESC LIMIT 6`,
+  );
+  const topCategories = await q<{ category: string; n: string }>(
+    `SELECT category, COUNT(*) n FROM leads
+      WHERE NOT suppressed AND category IS NOT NULL
+      GROUP BY 1 ORDER BY 2 DESC LIMIT 6`,
   );
   const followupsDue = await q<Lead>(
     `SELECT * FROM leads
@@ -229,6 +261,7 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
   return {
     totalLeads: Number(tot?.n ?? 0),
     newToday: Number(today?.n ?? 0),
+    newThisWeek: Number(week?.n ?? 0),
     suppressed: Number(sup?.n ?? 0),
     byTier: byTier.map((r) => ({
       tier: r.tier, n: Number(r.n),
@@ -239,6 +272,13 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
     recentRuns,
     pipelineMin,
     pipelineMax,
+    valueWonMax: Number(val?.won ?? 0),
+    valueInProgressMax: Number(val?.prog ?? 0),
+    wonCount: Number(val?.wonc ?? 0),
+    lostCount: Number(val?.lostc ?? 0),
+    workedCount: Number(val?.worked ?? 0),
+    topRegions: topRegions.map((r) => ({ region: r.region, n: Number(r.n) })),
+    topCategories: topCategories.map((r) => ({ category: r.category, n: Number(r.n) })),
   };
 }
 
