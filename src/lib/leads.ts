@@ -31,6 +31,9 @@ export interface Lead {
   contact_title: string | null;
   linkedin_url: string | null;
   contact_verified: boolean;
+  priority: string | null;
+  notes: string | null;
+  email_status: string | null;
   tier: string | null;
   tier_reason: string | null;
   est_deal_min_egp: string | null;
@@ -97,15 +100,25 @@ export async function getLead(id: number): Promise<Lead | null> {
   return r[0] ?? null;
 }
 
+// The Notion-style Priority options.
+export const PRIORITIES = ["Hot", "High", "Standard"] as const;
+export const EMAIL_STATUSES = ["Valid", "Catch-all"] as const;
+
 export interface ContactPatch {
   contact_person?: string | null;
   contact_title?: string | null;
   linkedin_url?: string | null;
   contact_verified?: boolean;
+  priority?: string | null;
+  notes?: string | null;
+  email_status?: string | null;
+  email?: string | null;
+  status?: string;
 }
 
-// Saves the user's manual people-enrichment edits. Only the fields present in
-// the patch are touched, so editing one cell never clears the others.
+// Saves the user's inline edits from the Leads database / detail page. Only
+// the fields present in the patch are touched, so editing one cell never
+// clears the others. Invalid enum values are ignored rather than stored.
 export async function updateLeadContact(
   id: number,
   patch: ContactPatch,
@@ -120,6 +133,14 @@ export async function updateLeadContact(
   if ("contact_title" in patch) add("contact_title", patch.contact_title || null);
   if ("linkedin_url" in patch) add("linkedin_url", patch.linkedin_url || null);
   if ("contact_verified" in patch) add("contact_verified", !!patch.contact_verified);
+  if ("notes" in patch) add("notes", patch.notes || null);
+  if ("email" in patch) add("email", patch.email || null);
+  if ("priority" in patch)
+    add("priority", patch.priority && PRIORITIES.includes(patch.priority as never) ? patch.priority : null);
+  if ("email_status" in patch)
+    add("email_status", patch.email_status && EMAIL_STATUSES.includes(patch.email_status as never) ? patch.email_status : null);
+  if ("status" in patch && patch.status && STATUSES.includes(patch.status as never))
+    add("status", patch.status);
   if (sets.length === 0) return;
   await q(`UPDATE leads SET ${sets.join(", ")} WHERE id=$1`, params);
 }
@@ -279,6 +300,64 @@ export async function outreachQueue(): Promise<OutreachRow[]> {
                            WHEN 'Silver' THEN 2 ELSE 3 END
       LIMIT 500`,
   );
+}
+
+export interface WhatsAppDue {
+  message_id: number;
+  lead_id: number;
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  phone_norm: string | null;
+  tier: string | null;
+  step_label: string | null;
+  body: string;
+  scheduled_for: string;
+}
+
+// WhatsApp sequence steps that are due to be sent (manually, via wa.me).
+// Only for leads still being worked and never for suppressed ones.
+export async function whatsappFollowupsDue(): Promise<WhatsAppDue[]> {
+  return q<WhatsAppDue>(
+    `SELECT m.id AS message_id, m.lead_id, l.name, l.contact_person,
+            l.phone, l.phone_norm, l.tier, m.step_label, m.body, m.scheduled_for
+       FROM outreach_messages m
+       JOIN leads l ON l.id = m.lead_id
+      WHERE m.channel='whatsapp' AND m.status='scheduled'
+        AND m.scheduled_for <= now()
+        AND NOT l.suppressed
+        AND l.status IN ('New','Contacted')
+      ORDER BY CASE l.tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
+                           WHEN 'Silver' THEN 2 ELSE 3 END,
+               m.scheduled_for
+      LIMIT 100`,
+  );
+}
+
+// Marks one WhatsApp step as sent (after the user taps the wa.me link),
+// logs it, and advances a brand-new lead to Contacted.
+export async function markWhatsappSent(messageId: number): Promise<boolean> {
+  const r = await q<{ lead_id: number; step_label: string | null }>(
+    `UPDATE outreach_messages
+        SET status='sent', provider='manual', sent_at=now(), updated_at=now()
+      WHERE id=$1 AND channel='whatsapp' AND status <> 'sent'
+      RETURNING lead_id, step_label`,
+    [messageId],
+  );
+  const row = r[0];
+  if (!row) return false;
+  await q(
+    `INSERT INTO contact_history (lead_id, channel, direction, note)
+     VALUES ($1,'whatsapp','out',$2)`,
+    [row.lead_id, `WhatsApp ${row.step_label ?? "message"} sent`],
+  );
+  await q(
+    `UPDATE leads SET last_contacted_at=now(),
+        status=CASE WHEN status='New' THEN 'Contacted' ELSE status END
+      WHERE id=$1`,
+    [row.lead_id],
+  );
+  return true;
 }
 
 export async function contactHistory(leadId: number) {

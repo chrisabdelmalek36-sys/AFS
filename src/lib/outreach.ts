@@ -26,9 +26,27 @@ export const EMAIL_SEQUENCE: EmailStep[] = [
   { index: 4, label: "Day 30", offsetDays: 30, intent: "Polite close-out / break-up email, leave the door open." },
 ];
 
+// WhatsApp follow-up cadence. WhatsApp can't be auto-sent safely, so each
+// step is scheduled and surfaces as a "due" reminder with a pre-filled
+// wa.me link the user taps to send.
+export interface WhatsappStep {
+  index: number;
+  label: string;
+  offsetDays: number;
+  intent: string;
+}
+
+export const WHATSAPP_SEQUENCE: WhatsappStep[] = [
+  { index: 0, label: "Day 0", offsetDays: 0, intent: "Warm intro: who AFS is, why relevant, soft ask to send catalogue or arrange a visit." },
+  { index: 1, label: "Day 2", offsetDays: 2, intent: "Gentle nudge on the first message. 1-2 sentences." },
+  { index: 2, label: "Day 6", offsetDays: 6, intent: "Value-add: a relevant reference project / proof point. No pressure." },
+  { index: 3, label: "Day 12", offsetDays: 12, intent: "Direct ask: propose a quick call or a tailored quote." },
+  { index: 4, label: "Day 25", offsetDays: 25, intent: "Friendly close-out, leave the door open." },
+];
+
 interface Generated {
   email: { index: number; subject: string; body: string }[];
-  whatsapp: string;
+  whatsapp: { index: number; body: string }[];
   linkedin: string;
   visit: string;
 }
@@ -88,11 +106,25 @@ function templates(lead: Lead): Generated {
     return { index: s.index, subject, body: body + emailFooter(lead.id) };
   });
 
-  const whatsapp =
-    `Hello ${lead.name}, this is ${AFS.company} — 33-year Nardi (Italy) ` +
-    `outdoor furniture distributor in Egypt (refs: Mövenpick Soma Bay, ` +
-    `Emaar Mivida).${newsLine} Could I send our catalogue or arrange a ` +
-    `quick visit for ${hook}?`;
+  const greet = lead.contact_person ? `Hello ${lead.contact_person}` : `Hello ${lead.name} team`;
+  const whatsapp = WHATSAPP_SEQUENCE.map((s) => {
+    let body = "";
+    if (s.index === 0)
+      body =
+        `${greet}, this is ${AFS.company} — 33-year Nardi (Italy) outdoor ` +
+        `furniture distributor in Egypt (refs: Mövenpick Soma Bay, Emaar ` +
+        `Mivida).${newsLine} Could I send our catalogue or arrange a quick ` +
+        `visit for ${hook}?`;
+    else if (s.index === 1)
+      body = `Hi again from ${AFS.company} — just checking you saw my note about Nardi outdoor furniture for ${hook}. Happy to send the catalogue whenever suits.`;
+    else if (s.index === 2)
+      body = `Quick proof point: our Nardi pieces are UV- and salt-resistant and in daily commercial use across Red Sea & New Cairo properties. Glad to share the spec sheet for ${cat}.`;
+    else if (s.index === 3)
+      body = `Would a 15-minute call this week work, or shall I prepare a tailored quote for ${hook} first? Either is easy.`;
+    else
+      body = `I won't keep messaging — if outdoor furniture isn't a priority now, no problem. Whenever it is, ${AFS.company} is one message away. 🙏`;
+    return { index: s.index, body };
+  });
 
   const linkedin =
     `Hi — ${AFS.company} here (33-yr Nardi distributor in Egypt). We work ` +
@@ -123,13 +155,18 @@ async function claude(lead: Lead): Promise<Generated | null> {
     `City/Region: ${lead.city ?? "-"} / ${lead.region ?? "-"}\n` +
     `Deal estimate EGP: ${lead.est_deal_min_egp}-${lead.est_deal_max_egp}\n` +
     (news ? `Recent news about them: "${news}"\n` : "") +
+    (lead.contact_person ? `Contact person: ${lead.contact_person}${lead.contact_title ? `, ${lead.contact_title}` : ""}\n` : "") +
     `\nReturn STRICT JSON only, no prose, shape:\n` +
     `{"email":[{"index":0,"subject":"","body":""}... 5 items indexes 0-4],` +
-    `"whatsapp":"","linkedin":"","visit":""}\n` +
+    `"whatsapp":[{"index":0,"body":""}... 5 items indexes 0-4],` +
+    `"linkedin":"","visit":""}\n` +
     `Email steps by index: ` +
     EMAIL_SEQUENCE.map((s) => `${s.index}=${s.label}:${s.intent}`).join(" | ") +
+    `\nWhatsApp steps by index: ` +
+    WHATSAPP_SEQUENCE.map((s) => `${s.index}=${s.label}:${s.intent}`).join(" | ") +
     `\nDo NOT include an unsubscribe footer (added automatically). ` +
-    `WhatsApp <=600 chars. LinkedIn <=300 chars. visit = a short visit brief.`;
+    `Each WhatsApp message <=500 chars, no greeting line repetition. ` +
+    `LinkedIn <=300 chars. visit = a short visit brief.`;
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -151,6 +188,7 @@ async function claude(lead: Lead): Promise<Generated | null> {
     const json = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
     const parsed = JSON.parse(json) as Generated;
     if (!Array.isArray(parsed.email) || parsed.email.length === 0) return null;
+    if (!Array.isArray(parsed.whatsapp) || parsed.whatsapp.length === 0) return null;
     // Always append the compliant footer ourselves.
     parsed.email = parsed.email.map((e) => ({
       ...e,
@@ -201,8 +239,25 @@ export async function generateOutreach(lead: Lead): Promise<GenerateResult> {
       [lead.id, e.index, step.label, e.subject, e.body, String(step.offsetDays), generatedBy],
     );
   }
+  // WhatsApp: a scheduled follow-up sequence (sent manually via wa.me links).
+  for (const w of g.whatsapp) {
+    const step = WHATSAPP_SEQUENCE.find((s) => s.index === w.index);
+    if (!step) continue;
+    await q(
+      `INSERT INTO outreach_messages
+         (lead_id, channel, step_index, step_label, body,
+          status, scheduled_for, generated_by, updated_at)
+       VALUES ($1,'whatsapp',$2,$3,$4,'scheduled',
+               now() + ($5 || ' days')::interval,$6, now())
+       ON CONFLICT (lead_id, channel, step_index) DO UPDATE SET
+         body=EXCLUDED.body, generated_by=EXCLUDED.generated_by,
+         status=CASE WHEN outreach_messages.status IN ('sent','simulated')
+                     THEN outreach_messages.status ELSE 'scheduled' END,
+         scheduled_for=EXCLUDED.scheduled_for, updated_at=now()`,
+      [lead.id, w.index, step.label, w.body, String(step.offsetDays), generatedBy],
+    );
+  }
   for (const [channel, body] of [
-    ["whatsapp", g.whatsapp],
     ["linkedin", g.linkedin],
     ["visit", g.visit],
   ] as const) {
@@ -223,7 +278,7 @@ export async function generateOutreach(lead: Lead): Promise<GenerateResult> {
     generatedBy,
     counts: {
       email: g.email.length,
-      whatsapp: 1,
+      whatsapp: g.whatsapp.length,
       linkedin: 1,
       visit: 1,
     },

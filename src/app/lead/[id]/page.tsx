@@ -12,6 +12,7 @@ import { generateOutreach } from "@/lib/outreach";
 import { Card, TierBadge, StatusBadge, egp } from "@/components/ui";
 import { visitBrief, whatsappDraft } from "@/lib/brief";
 import ContactPanel from "@/components/ContactPanel";
+import WhatsAppSequence from "@/components/WhatsAppSequence";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,7 @@ export default async function LeadPage({
   const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(waDraft)}`;
 
   const emailMsgs = messages.filter((m) => m.channel === "email");
+  const waSteps = messages.filter((m) => m.channel === "whatsapp");
   const liMsg = messages.find((m) => m.channel === "linkedin");
   const visitMsg = messages.find((m) => m.channel === "visit");
 
@@ -259,6 +261,14 @@ export default async function LeadPage({
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {waSteps.length > 0 && (
+                <WhatsAppSequence
+                  steps={waSteps}
+                  phone={lead.phone}
+                  phoneNorm={lead.phone_norm}
+                />
               )}
 
               {liMsg && (
