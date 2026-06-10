@@ -13,6 +13,7 @@ import { Card, TierBadge, StatusBadge, egp } from "@/components/ui";
 import { visitBrief, whatsappDraft } from "@/lib/brief";
 import ContactPanel from "@/components/ContactPanel";
 import WhatsAppSequence from "@/components/WhatsAppSequence";
+import DeleteLeadButton from "@/components/DeleteLeadButton";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +110,9 @@ export default async function LeadPage({
             DO NOT CONTACT
           </span>
         )}
+        <span className="ml-auto">
+          <DeleteLeadButton id={lead.id} name={lead.name} redirectTo="/leads" />
+        </span>
       </div>
 
       {!lead.suppressed && (

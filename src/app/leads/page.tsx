@@ -48,11 +48,17 @@ export default async function LeadsPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Leads</h1>
           <p className="text-sm text-slate-500">{leads.length} shown</p>
         </div>
+        <a
+          href="/api/export/leads"
+          className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+        >
+          ⬇ Export CSV (Excel)
+        </a>
       </div>
 
       <Card>
