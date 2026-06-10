@@ -9,34 +9,60 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Picks leads in a geographic cluster (a region) and returns an
-// optimised door-to-door order plus a Google Maps mobile link.
+// Picks leads in a geographic cluster (an area circle, a region, or
+// explicit ids) and returns an optimised door-to-door order plus a
+// Google Maps mobile link.
 export async function POST(req: Request) {
   const body = (await req.json()) as {
     region?: string;
+    area?: { lat: number; lng: number; radiusKm: number };
     maxStops?: number;
     ids?: number[];
   };
   const max = Math.min(Math.max(body.maxStops ?? 8, 2), 23);
 
-  const rows = body.ids?.length
-    ? await q<RouteStop>(
-        `SELECT id, name, lat, lng, tier, address FROM leads
-          WHERE id = ANY($1) AND lat IS NOT NULL AND NOT suppressed`,
-        [body.ids],
-      )
-    : await q<RouteStop>(
-        // Only route leads still to approach (status='New'); contacted /
-        // postponed leads are excluded so you don't re-visit them.
-        `SELECT id, name, lat, lng, tier, address FROM leads
-          WHERE lat IS NOT NULL AND NOT suppressed AND status = 'New'
-            ${body.region ? "AND region = $1" : ""}
-          ORDER BY CASE tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
-                             WHEN 'Silver' THEN 2 ELSE 3 END,
-                   freshness DESC
-          LIMIT ${max}`,
-        body.region ? [body.region] : [],
-      );
+  let rows: RouteStop[];
+  if (body.ids?.length) {
+    rows = await q<RouteStop>(
+      `SELECT id, name, lat, lng, tier, address FROM leads
+        WHERE id = ANY($1) AND lat IS NOT NULL AND NOT suppressed`,
+      [body.ids],
+    );
+  } else if (
+    body.area &&
+    Number.isFinite(body.area.lat) &&
+    Number.isFinite(body.area.lng) &&
+    Number.isFinite(body.area.radiusKm)
+  ) {
+    // Haversine in SQL: best New leads within the area circle.
+    rows = await q<RouteStop>(
+      `SELECT id, name, lat, lng, tier, address FROM leads
+        WHERE lat IS NOT NULL AND NOT suppressed AND status = 'New'
+          AND 2 * 6371 * asin(sqrt(
+                power(sin(radians(lat - $1) / 2), 2)
+                + cos(radians($1)) * cos(radians(lat))
+                  * power(sin(radians(lng - $2) / 2), 2)
+              )) <= $3
+        ORDER BY CASE tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
+                           WHEN 'Silver' THEN 2 ELSE 3 END,
+                 freshness DESC
+        LIMIT ${max}`,
+      [body.area.lat, body.area.lng, body.area.radiusKm],
+    );
+  } else {
+    // Only route leads still to approach (status='New'); contacted /
+    // postponed leads are excluded so you don't re-visit them.
+    rows = await q<RouteStop>(
+      `SELECT id, name, lat, lng, tier, address FROM leads
+        WHERE lat IS NOT NULL AND NOT suppressed AND status = 'New'
+          ${body.region ? "AND region = $1" : ""}
+        ORDER BY CASE tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
+                           WHEN 'Silver' THEN 2 ELSE 3 END,
+                 freshness DESC
+        LIMIT ${max}`,
+      body.region ? [body.region] : [],
+    );
+  }
 
   if (rows.length < 2) {
     return NextResponse.json(

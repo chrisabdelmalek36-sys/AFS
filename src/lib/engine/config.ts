@@ -109,6 +109,8 @@ export const GEO_ZONES: GeoZone[] = [
   { key: "new_capital",  label: "New Administrative Capital", region: "New Capital",    lat: 30.0131, lng: 31.7400, radiusM: 20000, priority: 1 },
   { key: "giza_sheikh_zayed", label: "Giza / Sheikh Zayed", region: "Greater Cairo",   lat: 30.0420, lng: 30.9760, radiusM: 18000, priority: 1 },
   { key: "new_cairo",    label: "New Cairo / 5th Settlement", region: "Greater Cairo", lat: 30.0080, lng: 31.4360, radiusM: 15000, priority: 1 },
+  { key: "east_new_cities", label: "Madinaty / Shorouk / Obour", region: "Greater Cairo", lat: 30.1400, lng: 31.5700, radiusM: 15000, priority: 2 },
+  { key: "ain_sokhna",   label: "Ain Sokhna",               region: "Red Sea",         lat: 29.6010, lng: 32.3170, radiusM: 15000, priority: 2 },
   { key: "el_gouna",     label: "El Gouna",                 region: "Red Sea",         lat: 27.3940, lng: 33.6780, radiusM: 12000, priority: 2 },
   { key: "hurghada",     label: "Hurghada",                 region: "Red Sea",         lat: 27.2579, lng: 33.8116, radiusM: 18000, priority: 2 },
   { key: "sahl_hasheesh",label: "Sahl Hasheesh",            region: "Red Sea",         lat: 27.0540, lng: 33.8920, radiusM: 10000, priority: 2 },

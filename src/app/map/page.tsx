@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listLeads, distinctValues, ACTIONABLE_STATUS } from "@/lib/leads";
+import { listLeads, ACTIONABLE_STATUS } from "@/lib/leads";
 import MapShell from "@/components/MapShell";
 import type { MapLead } from "@/components/LeafletMap";
 
@@ -11,7 +11,7 @@ export default async function MapPage({
   searchParams: { all?: string };
 }) {
   const showAll = searchParams.all === "1";
-  const [all, dv] = await Promise.all([listLeads(), distinctValues()]);
+  const all = await listLeads();
 
   const onMap = all.filter(
     (l) =>
@@ -66,7 +66,7 @@ export default async function MapPage({
           )}
         </div>
       </div>
-      <MapShell leads={leads} regions={dv.regions} />
+      <MapShell leads={leads} />
     </div>
   );
 }
