@@ -7,6 +7,7 @@ const ITEMS: [string, string][] = [
   ["/today", "Today"],
   ["/dashboard", "Dashboard"],
   ["/leads", "Leads"],
+  ["/pipeline", "Pipeline"],
   ["/database", "Database"],
   ["/map", "Map"],
   ["/outreach", "Outreach"],
