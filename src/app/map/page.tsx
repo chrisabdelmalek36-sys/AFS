@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function MapPage({
   searchParams,
 }: {
-  searchParams: { all?: string; area?: string };
+  searchParams: { all?: string; area?: string; areas?: string };
 }) {
   const showAll = searchParams.all === "1";
   const all = await listLeads();
@@ -66,7 +66,11 @@ export default async function MapPage({
           )}
         </div>
       </div>
-      <MapShell leads={leads} initialAreaKey={searchParams.area ?? ""} />
+      <MapShell
+        leads={leads}
+        initialAreaKey={searchParams.area ?? ""}
+        initialAreaKeys={searchParams.areas ?? ""}
+      />
     </div>
   );
 }
