@@ -11,6 +11,10 @@ import {
 } from "./sources/osmPlaces";
 import { nearestArea } from "../areas";
 import { overpassFetch } from "./util/overpass";
+import {
+  googlePlacesEnabled,
+  discoverGooglePlacesArea,
+} from "./sources/googlePlaces";
 import type { RawLead } from "./sources/types";
 
 // Resumable OSM discovery that fits inside Vercel's 60s function ceiling.
@@ -159,6 +163,7 @@ export interface TargetedArea {
 
 export interface TargetedResult {
   areas: string[];
+  source: "google" | "osm";
   categories: string[];
   custom: string[];
   queries: number;
@@ -208,43 +213,74 @@ export async function targetedScan(opts: {
   const raw: RawLead[] = [];
   let queries = 0;
   let failed = 0;
-  for (const job of jobs) {
-    if (Date.now() > opts.deadline - 8_000) break;
+  let source: "google" | "osm" = "osm";
+
+  // Preferred: Google Places — real, rated businesses (not crowd-sourced
+  // pins). Used automatically when a GOOGLE_MAPS_API_KEY is configured.
+  if (googlePlacesEnabled() && (cats.length > 0 || customKeywords.length > 0)) {
+    source = "google";
     try {
-      const elements = await overpassFetch(
-        buildMultiQuery(centers, job.selectors, 25),
-        { perTryMs: 16_000, deadline: opts.deadline },
-      );
-      for (const el of elements) {
-        const lat = el.lat ?? el.center?.lat;
-        const lng = el.lon ?? el.center?.lon;
-        const region =
-          (lat != null && lng != null ? nearestArea(lat, lng)?.group : null) ??
-          fallbackGroup ??
-          "Egypt";
-        const lead = toLead(el, job.key, region);
-        if (lead) raw.push(lead);
-      }
-      queries++;
+      const gleads = await discoverGooglePlacesArea({
+        centers: centers.map((c) => ({
+          ...c,
+          region:
+            nearestArea(c.lat, c.lng)?.group ?? fallbackGroup ?? "Egypt",
+        })),
+        categoryKeys: opts.categories,
+        customKeywords,
+        deadline: opts.deadline,
+      });
+      raw.push(...gleads);
+      queries = gleads.length > 0 ? jobs.length : 0;
     } catch (e) {
-      failed++;
-      log.warn(`Overpass failed (targeted/${job.key}):`, e);
+      failed = jobs.length;
+      log.warn("Google Places targeted failed:", e);
     }
-    await new Promise((res) => setTimeout(res, 250));
+  }
+
+  // Free fallback (or when no key): OpenStreetMap via Overpass.
+  if (raw.length === 0) {
+    source = "osm";
+    queries = 0;
+    failed = 0;
+    for (const job of jobs) {
+      if (Date.now() > opts.deadline - 8_000) break;
+      try {
+        const elements = await overpassFetch(
+          buildMultiQuery(centers, job.selectors, 25),
+          { perTryMs: 16_000, deadline: opts.deadline },
+        );
+        for (const el of elements) {
+          const lat = el.lat ?? el.center?.lat;
+          const lng = el.lon ?? el.center?.lon;
+          const region =
+            (lat != null && lng != null ? nearestArea(lat, lng)?.group : null) ??
+            fallbackGroup ??
+            "Egypt";
+          const lead = toLead(el, job.key, region);
+          if (lead) raw.push(lead);
+        }
+        queries++;
+      } catch (e) {
+        failed++;
+        log.warn(`Overpass failed (targeted/${job.key}):`, e);
+      }
+      await new Promise((res) => setTimeout(res, 250));
+    }
   }
 
   const { stats, ids } = await ingestRawLeads(raw, { enrich: false });
   if (queries > 0) {
     await query(
       `INSERT INTO api_usage (run_id, provider, calls, est_cost_usd)
-       VALUES ($1, 'osm', $2, 0)`,
-      [runId, queries],
+       VALUES ($1, $2, $3, 0)`,
+      [runId, source === "google" ? "google_places" : "osm", queries],
     );
   }
   const areaLabels = opts.areas.map((a) => a.label);
   await query(
     `UPDATE crawl_runs SET finished_at=now(), status='ok', stats=$2 WHERE id=$1`,
-    [runId, JSON.stringify({ areas: areaLabels, queries, ...stats })],
+    [runId, JSON.stringify({ areas: areaLabels, source, queries, ...stats })],
   );
 
   // What did we actually land? Group the matched leads by type and by tier
@@ -273,6 +309,7 @@ export async function targetedScan(opts: {
 
   return {
     areas: areaLabels,
+    source,
     categories: opts.categories,
     custom: customKeywords,
     queries,

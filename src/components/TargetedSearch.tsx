@@ -47,6 +47,7 @@ export default function TargetedSearch({
     breakdown: { category: string; n: number }[];
     tierBreakdown: { tier: string; n: number }[];
     ids: number[];
+    source: string;
   } | null>(null);
 
   const toggle = (key: string) =>
@@ -98,10 +99,11 @@ export default function TargetedSearch({
           breakdown: data.breakdown ?? [],
           tierBreakdown: data.tierBreakdown ?? [],
           ids: data.ids ?? [],
+          source: data.source ?? "osm",
         });
       } else if (data.busy) {
         setErr(
-          "OpenStreetMap is busy right now and didn't respond. Please wait a few seconds and try again — your selection is kept.",
+          "The map data source is busy right now and didn't respond. Please wait a few seconds and try again — your selection is kept.",
         );
       } else {
         setNote(
@@ -288,7 +290,13 @@ export default function TargetedSearch({
             {result.areas.length ? ` in ${result.areas.join(", ")}` : ""}
           </p>
           <p className="mt-0.5 text-sm text-emerald-700">
-            {result.inserted} new · {result.updated} already in your list
+            {result.inserted} new · {result.updated} already in your list ·
+            source:{" "}
+            <b>
+              {result.source === "google"
+                ? "Google Places (rated)"
+                : "OpenStreetMap (free)"}
+            </b>
           </p>
 
           {result.tierBreakdown.length > 0 && (

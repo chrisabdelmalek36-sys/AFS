@@ -141,3 +141,69 @@ export const googlePlacesSource: Source = {
     return out;
   },
 };
+
+export const googlePlacesEnabled = (): boolean => !!config.google.apiKey;
+
+// Targeted Google Places discovery for the "Find leads" page: real, rated
+// businesses of the chosen categories (+ free-text keywords) across one or
+// more area circles. Returns RawLeads carrying rating / review count / price
+// level, which the tiering uses to promote genuinely good venues.
+export async function discoverGooglePlacesArea(opts: {
+  centers: { lat: number; lng: number; radiusM: number; region: string }[];
+  categoryKeys: string[];
+  customKeywords: string[];
+  deadline: number;
+  maxCalls?: number;
+}): Promise<RawLead[]> {
+  if (!config.google.apiKey) return [];
+  const cats = CATEGORIES.filter((c) => opts.categoryKeys.includes(c.key));
+  const out: RawLead[] = [];
+  let calls = 0;
+  const cap = opts.maxCalls ?? config.google.maxCallsPerRun;
+
+  for (const z of opts.centers) {
+    for (const cat of cats) {
+      if (calls >= cap || Date.now() > opts.deadline - 6_000) return out;
+      try {
+        const places =
+          cat.placeTypes.length > 0
+            ? await callPlaces(ENDPOINT_NEARBY, {
+                includedTypes: cat.placeTypes,
+                maxResultCount: 20,
+                locationRestriction: {
+                  circle: { center: { latitude: z.lat, longitude: z.lng }, radius: z.radiusM },
+                },
+              })
+            : await callPlaces(ENDPOINT_TEXT, {
+                textQuery: `${cat.keywords[0]} near ${z.lat},${z.lng}`,
+                maxResultCount: 20,
+                locationBias: {
+                  circle: { center: { latitude: z.lat, longitude: z.lng }, radius: z.radiusM },
+                },
+              });
+        calls++;
+        for (const p of places) out.push(toRawLead(p, cat.key, z.region));
+      } catch (e) {
+        log.warn(`Places area call failed (${cat.key}):`, e);
+      }
+    }
+    for (const kw of opts.customKeywords) {
+      if (calls >= cap || Date.now() > opts.deadline - 6_000) return out;
+      try {
+        const places = await callPlaces(ENDPOINT_TEXT, {
+          textQuery: `${kw} near ${z.lat},${z.lng}`,
+          maxResultCount: 20,
+          locationBias: {
+            circle: { center: { latitude: z.lat, longitude: z.lng }, radius: z.radiusM },
+          },
+        });
+        calls++;
+        for (const p of places) out.push(toRawLead(p, kw.toLowerCase(), z.region));
+      } catch (e) {
+        log.warn(`Places keyword call failed (${kw}):`, e);
+      }
+    }
+  }
+  log.info(`Google Places (targeted): ${calls} calls, ${out.length} raw`);
+  return out;
+}
