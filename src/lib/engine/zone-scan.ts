@@ -170,6 +170,7 @@ export interface TargetedResult {
   suppressed: number;
   ids: number[];
   breakdown: { category: string; n: number }[];
+  tierBreakdown: { tier: string; n: number }[];
 }
 
 export async function targetedScan(opts: {
@@ -246,9 +247,10 @@ export async function targetedScan(opts: {
     [runId, JSON.stringify({ areas: areaLabels, queries, ...stats })],
   );
 
-  // What did we actually land? Group the matched leads by type for the
-  // result summary the user sees before opening the map.
+  // What did we actually land? Group the matched leads by type and by tier
+  // for the result summary the user sees before opening the map.
   let breakdown: { category: string; n: number }[] = [];
+  let tierBreakdown: { tier: string; n: number }[] = [];
   if (ids.length > 0) {
     breakdown = (
       await query<{ category: string; n: string }>(
@@ -257,6 +259,16 @@ export async function targetedScan(opts: {
         [ids],
       )
     ).rows.map((r) => ({ category: r.category, n: Number(r.n) }));
+    tierBreakdown = (
+      await query<{ tier: string; n: string }>(
+        `SELECT COALESCE(tier,'Unrated') tier, COUNT(*) n
+           FROM leads WHERE id = ANY($1) GROUP BY 1
+          ORDER BY CASE COALESCE(tier,'Unrated')
+                     WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
+                     WHEN 'Silver' THEN 2 ELSE 3 END`,
+        [ids],
+      )
+    ).rows.map((r) => ({ tier: r.tier, n: Number(r.n) }));
   }
 
   return {
@@ -269,5 +281,6 @@ export async function targetedScan(opts: {
     ...stats,
     ids,
     breakdown,
+    tierBreakdown,
   };
 }

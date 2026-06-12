@@ -96,6 +96,21 @@ export function toLead(el: OsmElement, categoryKey: string, region: string): Raw
     t["addr:state"],
     t["addr:country"],
   ].filter(Boolean);
+
+  // Quality signals straight from OSM tags — these tell a real prospect (an
+  // upscale hotel, a restaurant with a terrace) apart from a nameless pin.
+  const starsRaw = tagOr(t, "stars");
+  const stars = starsRaw ? parseInt(starsRaw, 10) : undefined;
+  const roomsRaw = tagOr(t, "rooms");
+  const rooms = roomsRaw ? parseInt(roomsRaw, 10) : undefined;
+  const cuisine = tagOr(t, "cuisine");
+  const fastFood =
+    t["amenity"] === "fast_food" ||
+    /fast_food|burger|fried_chicken|sandwich|kebab|shawarma|pizza|chicken/i.test(
+      cuisine ?? "",
+    );
+  const outdoorSeating = (t["outdoor_seating"] ?? "").toLowerCase() === "yes";
+
   return {
     name,
     category: categoryKey,
@@ -108,6 +123,11 @@ export function toLead(el: OsmElement, categoryKey: string, region: string): Raw
     phone: tagOr(t, "phone", "contact:phone"),
     website: tagOr(t, "website", "contact:website", "url"),
     email: tagOr(t, "email", "contact:email"),
+    stars: Number.isFinite(stars) ? stars : undefined,
+    rooms: Number.isFinite(rooms) ? rooms : undefined,
+    cuisine,
+    fastFood,
+    outdoorSeating,
     source: "osm",
     sourceUrl: `https://www.openstreetmap.org/${el.type}/${el.id}`,
     raw: { osm_id: el.id, osm_type: el.type, tags: t },
