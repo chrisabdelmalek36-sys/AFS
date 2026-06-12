@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { MapLead, MapFocus } from "@/components/LeafletMap";
 import {
   AREAS,
@@ -43,6 +44,7 @@ export default function MapShell({
   initialAreaKeys?: string;
   initialIds?: string;
 }) {
+  const router = useRouter();
   // A specific search result (/map?ids=…): show ONLY these leads.
   const [idFilter, setIdFilter] = useState<number[]>(
     initialIds
@@ -151,9 +153,23 @@ export default function MapShell({
           }
         : null;
 
-  // Fresh plan. Removed stops are always excluded; when a route already
-  // exists, its current stops are excluded too and picks are shuffled, so
-  // re-planning gives DIFFERENT places instead of the same route again.
+  // API ids may arrive as strings (bigint) — normalise once on receipt so
+  // every later comparison is number === number.
+  type PlanData = {
+    stops: PlannedStop[];
+    distanceKm: number;
+    optimisedBy: string;
+    googleMapsUrl: string;
+  };
+  const normalisePlan = (d: PlanData): PlanData => ({
+    ...d,
+    stops: d.stops.map((s) => ({ ...s, id: Number(s.id) })),
+  });
+
+  // Fresh plan, scoped to what's on screen: a search result (ids), a
+  // multi-area view, one area, or all Egypt. Removed stops are always
+  // excluded; when a route already exists its stops are excluded too and
+  // picks are shuffled, so re-planning gives DIFFERENT places.
   async function planRoute() {
     const excludeNow = plan
       ? [...removedIds, ...plan.stops.map((s) => Number(s.id))]
@@ -162,21 +178,33 @@ export default function MapShell({
     setErr(null);
     setManualOrder(false);
     try {
-      const res = await fetch("/api/route/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      let payload: Record<string, unknown>;
+      if (idsActive || multiActive) {
+        // Route the leads currently in view (best-first order from the
+        // server), skipping removed/excluded ones.
+        const ids = shown
+          .map((l) => Number(l.id))
+          .filter((x) => !excludeNow.includes(x))
+          .slice(0, maxStops);
+        payload = { ids };
+      } else {
+        payload = {
           area: area
             ? { lat: area.lat, lng: area.lng, radiusKm: area.radiusKm }
             : undefined,
           maxStops,
           exclude: excludeNow,
           shuffle: plan != null,
-        }),
+        };
+      }
+      const res = await fetch("/api/route/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to plan route");
-      setPlan(data);
+      setPlan(normalisePlan(data));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -198,7 +226,7 @@ export default function MapShell({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to update route");
-      setPlan(data);
+      setPlan(normalisePlan(data));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -208,9 +236,35 @@ export default function MapShell({
 
   const stopIds = plan?.stops.map((s) => Number(s.id)) ?? [];
 
+  // "Remove for now": off this route + not suggested again this session.
   function removeStop(id: number) {
-    setRemovedIds((r) => [...r, id]); // never suggest it again this session
+    setRemovedIds((r) => [...r, id]);
     replan(stopIds.filter((x) => x !== id), manualOrder);
+  }
+  // "Remove from the map completely": deletes the lead for good (the engine
+  // remembers it, so scans won't re-import it), then re-plans without it.
+  async function deleteStop(id: number, name: string) {
+    if (
+      !window.confirm(
+        `Delete "${name}" from the map completely?\n\nThis removes the lead everywhere (Leads, Database, Map) and it will NOT come back in future scans.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/lead/${id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error();
+      setRemovedIds((p) => [...p, id]);
+      setIdFilter((f) => f.filter((x) => x !== id));
+      router.refresh(); // pin disappears from the map data
+      const rest = stopIds.filter((x) => x !== id);
+      if (rest.length >= 2) await replan(rest, manualOrder);
+      else setPlan(null);
+    } catch {
+      setErr("Delete failed — try again.");
+    } finally {
+      setBusy(false);
+    }
   }
   function addStop(id: number) {
     if (id && !stopIds.includes(id)) replan([...stopIds, id], manualOrder);
@@ -346,18 +400,23 @@ export default function MapShell({
             />
             <button
               onClick={planRoute}
-              disabled={busy || (area != null && shown.length < 2)}
+              disabled={
+                busy ||
+                ((area != null || idsActive || multiActive) && shown.length < 2)
+              }
               className="w-full rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
             >
               {busy
                 ? "Planning…"
-                : plan
-                  ? `New route (other places)${area ? ` in ${area.label}` : ""}`
-                  : `Plan route${area ? ` in ${area.label}` : ""}`}
+                : idsActive || multiActive
+                  ? `Plan route from these ${shown.length} results`
+                  : plan
+                    ? `New route (other places)${area ? ` in ${area.label}` : ""}`
+                    : `Plan route${area ? ` in ${area.label}` : ""}`}
             </button>
-            {area != null && shown.length < 2 && (
+            {(area != null || idsActive || multiActive) && shown.length < 2 && (
               <p className="mt-2 text-xs text-slate-500">
-                Need at least 2 leads in this area to plan a route.
+                Need at least 2 leads in view to plan a route.
               </p>
             )}
             {err && <p className="mt-2 text-xs text-rose-600">{err}</p>}
@@ -411,14 +470,28 @@ export default function MapShell({
                         {s.address ?? "—"}
                       </p>
                     </div>
-                    <button
-                      onClick={() => removeStop(s.id)}
-                      disabled={busy || plan.stops.length <= 2}
-                      title={plan.stops.length <= 2 ? "A route needs at least 2 stops" : "Remove this stop"}
-                      className="mt-0.5 shrink-0 rounded px-1.5 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
-                    >
-                      ✕
-                    </button>
+                    <span className="mt-0.5 flex shrink-0 items-center">
+                      <button
+                        onClick={() => removeStop(Number(s.id))}
+                        disabled={busy || plan.stops.length <= 2}
+                        title={
+                          plan.stops.length <= 2
+                            ? "A route needs at least 2 stops"
+                            : "Remove from this route only (stays on the map)"
+                        }
+                        className="rounded px-1.5 text-xs text-slate-400 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-40"
+                      >
+                        ✕
+                      </button>
+                      <button
+                        onClick={() => deleteStop(Number(s.id), s.name)}
+                        disabled={busy}
+                        title="Delete from the map completely (never comes back)"
+                        className="rounded px-1.5 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                      >
+                        🗑
+                      </button>
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -446,9 +519,10 @@ export default function MapShell({
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-slate-400">
-                  ✕ removes a stop (it won&apos;t be suggested again). Change a
-                  stop&apos;s number to make it first/last. &quot;New route&quot;
-                  picks different places entirely.
+                  ✕ removes a stop from this route only · 🗑 deletes it from the
+                  map forever. Change a stop&apos;s number to make it
+                  first/last. &quot;New route&quot; picks different places
+                  entirely.
                 </p>
               </div>
             </div>
