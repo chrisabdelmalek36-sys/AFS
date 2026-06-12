@@ -32,7 +32,7 @@ export default async function MapPage({
   ).length;
 
   const leads: MapLead[] = onMap.map((l) => ({
-    id: l.id,
+    id: Number(l.id),
     name: l.name,
     lat: Number(l.lat),
     lng: Number(l.lng),

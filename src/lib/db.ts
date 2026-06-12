@@ -1,5 +1,11 @@
 import pg, { type QueryResult, type QueryResultRow } from "pg";
 
+// node-pg returns BIGINT (int8) as a *string* by default, which made every
+// lead id a string at runtime while the UI compared them as numbers (broken
+// route editing, broken ?ids= map filter). Our ids and EGP deal values are
+// far below Number.MAX_SAFE_INTEGER, so parse them as numbers globally.
+pg.types.setTypeParser(20, (v) => Number(v));
+
 // Vercel's Neon integration may name the env var POSTGRES_URL (newer
 // integrations) or DATABASE_URL (older / classic). Accept both, plus
 // Prisma's variants, so the user never has to rename anything by hand.
