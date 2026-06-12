@@ -232,7 +232,7 @@ export default function LeadsBoard({ leads }: { leads: BoardLead[] }) {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={11} className="px-3 py-8 text-center text-slate-400">
-                  No leads match. Open the Dashboard and click <b>Find real leads</b>.
+                  No leads match. Use <a href="/find" className="font-semibold text-violet-700 underline">Find leads</a> to pull more, or clear the filters.
                 </td>
               </tr>
             )}
