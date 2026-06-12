@@ -1,4 +1,5 @@
-import { listLeads } from "@/lib/leads";
+import { q } from "@/lib/db";
+import type { Lead } from "@/lib/leads";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,14 @@ function csvCell(v: unknown): string {
 
 // Downloads the lead book as a CSV (opens directly in Excel / Google Sheets).
 export async function GET() {
-  const leads = await listLeads();
+  // Export the WHOLE book (listLeads caps at 1000 for page rendering).
+  const leads = await q<Lead>(
+    `SELECT * FROM leads
+      ORDER BY suppressed ASC,
+               CASE tier WHEN 'Platinum' THEN 0 WHEN 'Gold' THEN 1
+                         WHEN 'Silver' THEN 2 ELSE 3 END,
+               freshness DESC, id DESC`,
+  );
   const header = [
     "id", "company", "contact_person", "contact_title", "email",
     "email_status", "linkedin_url", "contact_verified", "phone", "website",

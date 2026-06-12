@@ -154,7 +154,7 @@ export default async function LeadsPage({
             {leads.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
-                  No leads yet. Open the Dashboard and click <b>Find real leads</b>.
+                  No leads match. Try the <Link href="/find" className="font-semibold text-violet-700 underline">Find leads</Link> page to pull more, or clear the filters.
                 </td>
               </tr>
             )}

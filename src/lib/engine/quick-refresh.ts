@@ -6,78 +6,20 @@
 import { query } from "../db";
 import { log } from "./util/logger";
 import { BudgetGuard } from "./util/budget";
-import { dedupHash, normalizeName, normalizePhone } from "./util/dedup";
-import { classify } from "./util/tiering";
-import { freshnessScore } from "./util/freshness";
+import { ingestRawLeads } from "./ingest";
 import { newsSource } from "./sources/news";
 import { govTenderSource } from "./sources/govTenders";
 import { processOutreachQueue } from "./sender";
 import { runDigest } from "./digest-builder";
 import type { RawLead } from "./sources/types";
 
+// Use the shared ingest so news/gov leads get the same treatment as scanned
+// ones: dedupe, relevance + quality gate, do-not-contact suppression, and —
+// critically — the deleted_leads guard, so a lead you deleted is never
+// resurrected by the daily refresh.
 async function persistLeads(raw: RawLead[]): Promise<{ inserted: number; updated: number }> {
-  let inserted = 0,
-    updated = 0;
-
-  for (const r of raw) {
-    const hash = dedupHash(r);
-    const phoneNorm = normalizePhone(r.phone);
-    const nameNorm = normalizeName(r.name);
-
-    const ex = await query<{ id: number }>(
-      `SELECT id FROM leads
-        WHERE dedup_hash=$1
-           OR (google_place_id IS NOT NULL AND google_place_id=$2)
-        LIMIT 1`,
-      [hash, r.googlePlaceId ?? null],
-    );
-    const isNew = ex.rowCount === 0;
-
-    const t = classify({
-      name: r.name,
-      category: r.category,
-      rating: r.rating,
-      userRatings: r.userRatings,
-      priceLevel: r.priceLevel,
-      newsHot: r.newsHot,
-    });
-    const fresh = freshnessScore({
-      source: r.source,
-      publishedAt: r.publishedAt,
-      newsHot: r.newsHot,
-      isNew,
-    });
-
-    if (isNew) {
-      await query(
-        `INSERT INTO leads
-          (dedup_hash, name, name_norm, category, address, city, region,
-           lat, lng, phone, phone_norm, website, email,
-           tier, tier_reason, est_deal_min_egp, est_deal_max_egp,
-           freshness, source_primary, source_url, raw)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
-         ON CONFLICT (dedup_hash) DO NOTHING`,
-        [
-          hash, r.name, nameNorm, r.category ?? null, r.address ?? null,
-          r.city ?? null, r.region ?? null, r.lat ?? null, r.lng ?? null,
-          r.phone ?? null, phoneNorm || null, r.website ?? null, r.email ?? null,
-          t.tier, t.reason, t.dealMinEgp || null, t.dealMaxEgp || null,
-          fresh, r.source, r.sourceUrl ?? null, JSON.stringify(r.raw ?? {}),
-        ],
-      );
-      inserted++;
-    } else {
-      await query(
-        `UPDATE leads SET
-            last_seen=now(),
-            freshness=GREATEST(freshness, $2)
-          WHERE id=$1`,
-        [ex.rows[0]!.id, fresh],
-      );
-      updated++;
-    }
-  }
-  return { inserted, updated };
+  const { stats } = await ingestRawLeads(raw, { enrich: false });
+  return { inserted: stats.inserted, updated: stats.updated };
 }
 
 export interface QuickRefreshResult {
