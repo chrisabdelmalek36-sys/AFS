@@ -4,7 +4,7 @@ import { dedupHash, normalizeName, normalizePhone } from "./util/dedup";
 import { classify } from "./util/tiering";
 import { freshnessScore } from "./util/freshness";
 import { findWebsiteEmail } from "./enrich/website";
-import { isRelevantBusiness } from "./util/relevance";
+import { isRelevantBusiness, isQualityProspect } from "./util/relevance";
 import type { RawLead } from "./sources/types";
 
 // Shared merge + tier + store stage, used by the full pipeline (scripts/CLI)
@@ -53,6 +53,11 @@ export function mergeBatch(raw: RawLead[]): Merged[] {
     ex.userRatings = Math.max(ex.userRatings ?? 0, r.userRatings ?? 0) || undefined;
     ex.priceLevel = Math.max(ex.priceLevel ?? 0, r.priceLevel ?? 0) || undefined;
     ex.newsHot = ex.newsHot || r.newsHot;
+    ex.stars = Math.max(ex.stars ?? 0, r.stars ?? 0) || undefined;
+    ex.rooms = Math.max(ex.rooms ?? 0, r.rooms ?? 0) || undefined;
+    ex.cuisine ??= r.cuisine;
+    ex.outdoorSeating = ex.outdoorSeating || r.outdoorSeating;
+    ex.fastFood = ex.fastFood && r.fastFood; // only fast food if all sources agree
     ex.publishedAt = ex.publishedAt ?? r.publishedAt;
     ex.provenance.push({ source: r.source, sourceUrl: r.sourceUrl, publishedAt: r.publishedAt, raw: r.raw });
   }
@@ -87,8 +92,16 @@ export async function ingestRawLeads(
   raw: RawLead[],
   opts: { enrich: boolean },
 ): Promise<{ stats: IngestStats; ids: number[] }> {
-  let merged = mergeBatch(raw).filter((m) =>
-    isRelevantBusiness(m.name, m.category),
+  let merged = mergeBatch(raw).filter(
+    (m) =>
+      isRelevantBusiness(m.name, m.category) &&
+      isQualityProspect(m.name, m.category, {
+        hasWebsite: !!m.website,
+        hasPhone: !!m.phone,
+        outdoorSeating: m.outdoorSeating,
+        stars: m.stars,
+        fastFood: m.fastFood,
+      }),
   );
   // Never resurrect a lead the user explicitly deleted.
   if (merged.length > 0) {
@@ -140,6 +153,9 @@ export async function ingestRawLeads(
       userRatings: m.userRatings,
       priceLevel: m.priceLevel,
       newsHot: m.newsHot,
+      stars: m.stars,
+      outdoorSeating: m.outdoorSeating,
+      hasWebsite: !!(m.website ?? email),
     });
 
     const fresh = freshnessScore({

@@ -34,3 +34,35 @@ export function isRelevantBusiness(
   if (!category || !SCREENED_CATEGORIES.has(category)) return true;
   return !IRRELEVANT_NAME_RE.test(name);
 }
+
+// Names that signal an upscale / sit-down venue worth approaching.
+const PREMIUM_NAME_RE =
+  /grill|rooftop|lounge|bistro|brasserie|steak|sushi|italian|french|seafood|terrace|garden|gourmet|fine\s?dining|trattoria|ristorante|club|resort|hotel|nile|marina|beach/i;
+
+export interface ProspectSignals {
+  hasWebsite?: boolean;
+  hasPhone?: boolean;
+  outdoorSeating?: boolean;
+  stars?: number;
+  fastFood?: boolean;
+}
+
+// A genuine potential client (vs. a nameless OSM pin). Hotels, resorts,
+// developers, schools, clubs, hospitals etc. are institutional buyers and
+// always qualify. Restaurants/cafes — the noisy categories — must show at
+// least one real-business signal and must not be fast food.
+export function isQualityProspect(
+  name: string,
+  category: string | null | undefined,
+  s: ProspectSignals,
+): boolean {
+  if (!category || !SCREENED_CATEGORIES.has(category)) return true;
+  if (s.fastFood) return false;
+  return !!(
+    s.hasWebsite ||
+    s.hasPhone ||
+    s.outdoorSeating ||
+    (s.stars ?? 0) > 0 ||
+    PREMIUM_NAME_RE.test(name)
+  );
+}

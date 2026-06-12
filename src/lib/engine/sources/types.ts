@@ -20,6 +20,13 @@ export interface RawLead {
   userRatings?: number;
   priceLevel?: number;
 
+  // OSM quality signals (sparse but valuable for B2B fit).
+  stars?: number;            // hotel star rating
+  rooms?: number;            // hotel size
+  cuisine?: string;
+  fastFood?: boolean;        // cheap-eats / fast-food signal
+  outdoorSeating?: boolean;  // terrace/garden — prime outdoor-furniture fit
+
   source: string;          // google_places | newsapi | gdelt | gov_tender | sample
   sourceUrl?: string;
   publishedAt?: string;    // ISO, for news/tender items

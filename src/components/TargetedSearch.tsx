@@ -13,6 +13,13 @@ export interface AreaOpt {
   group: string;
 }
 
+const TIER_COLOR: Record<string, string> = {
+  Platinum: "#7c3aed",
+  Gold: "#d97706",
+  Silver: "#64748b",
+  Unrated: "#94a3b8",
+};
+
 // Pick the lead types (preset or your own) + the area(s) — one area, a whole
 // region, or several — then pull matching businesses from OpenStreetMap and
 // drop the result straight onto the map.
@@ -38,6 +45,7 @@ export default function TargetedSearch({
     updated: number;
     areas: string[];
     breakdown: { category: string; n: number }[];
+    tierBreakdown: { tier: string; n: number }[];
     ids: number[];
   } | null>(null);
 
@@ -88,6 +96,7 @@ export default function TargetedSearch({
           updated: data.updated ?? 0,
           areas: data.areas ?? [],
           breakdown: data.breakdown ?? [],
+          tierBreakdown: data.tierBreakdown ?? [],
           ids: data.ids ?? [],
         });
       } else if (data.busy) {
@@ -282,16 +291,36 @@ export default function TargetedSearch({
             {result.inserted} new · {result.updated} already in your list
           </p>
 
+          {result.tierBreakdown.length > 0 && (
+            <div className="mt-3">
+              <p className="mb-1 text-xs font-medium text-emerald-700">Quality</p>
+              <div className="flex flex-wrap gap-2">
+                {result.tierBreakdown.map((tb) => (
+                  <span
+                    key={tb.tier}
+                    className="rounded-full px-3 py-1 text-xs font-semibold text-white"
+                    style={{ backgroundColor: TIER_COLOR[tb.tier] ?? "#94a3b8" }}
+                  >
+                    {tb.tier}: {tb.n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {result.breakdown.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {result.breakdown.map((b) => (
-                <span
-                  key={b.category}
-                  className="rounded-full bg-white px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
-                >
-                  {b.category}: <b>{b.n}</b>
-                </span>
-              ))}
+            <div className="mt-3">
+              <p className="mb-1 text-xs font-medium text-emerald-700">By type</p>
+              <div className="flex flex-wrap gap-2">
+                {result.breakdown.map((b) => (
+                  <span
+                    key={b.category}
+                    className="rounded-full bg-white px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                  >
+                    {b.category}: <b>{b.n}</b>
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
